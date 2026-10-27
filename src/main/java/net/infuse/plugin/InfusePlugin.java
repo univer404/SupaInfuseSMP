@@ -82,6 +82,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         if (passiveTask != null) passiveTask.cancel();
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             for (Player hidden : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, hidden);
+            clearHasteStack(viewer);
         }
         saveData();
     }
@@ -1615,6 +1616,26 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 return;
             }
         }
+    }
+
+    @EventHandler
+    public void quit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        clearHasteStack(player);
+        invisiblePlayers.remove(player.getUniqueId());
+        fireGlidingPlayers.remove(player.getUniqueId());
+        oceanAir.remove(player.getUniqueId());
+        oceanLastActive.remove(player.getUniqueId());
+    }
+
+    private void clearHasteStack(Player player) {
+        UUID id = player.getUniqueId();
+        org.bukkit.attribute.AttributeModifier modifier = hasteModifiers.remove(id);
+        var attribute = player.getAttribute(Attribute.ATTACK_SPEED);
+        if (attribute != null && modifier != null) attribute.removeModifier(modifier);
+        hasteStacks.remove(id);
+        org.bukkit.scheduler.BukkitTask task = hasteResetTasks.remove(id);
+        if (task != null) task.cancel();
     }
 
     @EventHandler public void join(PlayerJoinEvent e) {
