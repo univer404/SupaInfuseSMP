@@ -1086,7 +1086,19 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         active.remove("");
         if (active.contains("strength")) {
             double multiplier = target instanceof Player ? 1.2 : getConfig().getDouble("effects.strength.mob-damage-multiplier", 2.0);
+            if (sparkEnds.getOrDefault(attacker.getUniqueId() + ":strength", 0L) > System.currentTimeMillis()) multiplier *= 1.5;
             event.setDamage(event.getDamage() * multiplier);
+            if (target instanceof Player victim && victim.isBlocking()) {
+                victim.setCooldown(Material.SHIELD, getConfig().getInt("effects.strength.shield-disable-ticks", 200));
+                ItemStack shield = victim.getInventory().getItemInOffHand().getType() == Material.SHIELD
+                        ? victim.getInventory().getItemInOffHand() : victim.getInventory().getItemInMainHand().getType() == Material.SHIELD
+                        ? victim.getInventory().getItemInMainHand() : null;
+                if (shield != null && shield.hasItemMeta() && shield.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable damageable) {
+                    damageable.setDamage(damageable.getDamage() + getConfig().getInt("effects.strength.shield-durability-damage", 20));
+                    shield.setItemMeta((org.bukkit.inventory.meta.ItemMeta) damageable);
+                    if (damageable.getDamage() >= shield.getType().getMaxDurability()) shield.setAmount(0);
+                }
+            }
         }
         if (active.contains("fire") && countHit(attacker, "fire") % getConfig().getInt("effects.fire.trigger-hits", 5) == 0) {
             target.setFireTicks(Math.max(target.getFireTicks(), getConfig().getInt("effects.fire.ignite-ticks", 100)));
