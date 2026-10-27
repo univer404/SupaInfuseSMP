@@ -1,5 +1,6 @@
 package com.catadmirer.infuseSMP;
 
+import com.catadmirer.infuseSMP.effects.EffectRegistry;
 import com.catadmirer.infuseSMP.gui.CraftingGui;
 import com.catadmirer.infuseSMP.gui.InfuseGui;
 import com.catadmirer.infuseSMP.gui.RecipeBookGui;
@@ -37,8 +38,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class Infuse extends JavaPlugin {
-    static final List<String> EFFECTS = List.of("emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
-    private static final List<String> ICON_EFFECTS = List.of("earth","emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
+    static final List<String> EFFECTS = EffectRegistry.playableEffects();
+    private static final List<String> ICON_EFFECTS = EffectRegistry.iconEffects();
     private final MiniMessage mini = MiniMessage.miniMessage();
     private final Map<UUID, String[]> equipped = new HashMap<>();
     private final Map<UUID, boolean[]> augmented = new HashMap<>();
