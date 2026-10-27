@@ -41,6 +41,11 @@ effects:
     craft-limit: -1
     augment-limit: 0
     initial-bounce-power: 1.2
+    trigger-hits: 3
+    max-wind-charge: 2
+    wind-burst-fall-min: 2.0
+    wind-burst-power: 1.0
+    wind-burst-damage-multiplier: 0.5
     fall-trigger-threshold: 4.0
     min-shockwave-radius: 2.0
     max-shockwave-radius: 8.0
@@ -55,6 +60,7 @@ effects:
     augment-limit: 0
     trigger-hits: 5
     ignite-ticks: 100
+    eternal-ticks: 200
     snowball-cooldown-seconds: 15
     swim-power: 0.5
   frost:
@@ -81,6 +87,7 @@ effects:
     egap-absorption-tier: 4
     food-absorption-duration-ticks: 1200
     spark-heal-percentage: 0.2
+    trigger-hits: 10
     return-after-hit: 10.0
   invisibility:
     color: "#7E00FC"
