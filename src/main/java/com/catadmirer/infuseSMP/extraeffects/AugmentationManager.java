@@ -1,4 +1,4 @@
-package com.catadmirer.infuseSMP.extraeffects;
+package com.supainfuse.smp.extraeffects;
 
 /**
  * Applies the original Infuse augmented-slot cooldown rule.
