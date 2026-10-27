@@ -52,6 +52,7 @@ effects:
     trigger-hits: 5
     ignite-ticks: 100
     snowball-cooldown-seconds: 15
+    swim-power: 0.5
   frost:
     color: "#7AE3FC"
     cooldown-seconds: 60
