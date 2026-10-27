@@ -764,10 +764,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     @EventHandler public void damage(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player attacker)) return;
         if (!(event.getEntity() instanceof org.bukkit.entity.LivingEntity target)) return;
-        if (target instanceof Player victim && trusted.getOrDefault(attacker.getUniqueId(), Set.of()).contains(victim.getUniqueId())) {
-            event.setCancelled(true);
-            return;
-        }
+        if (target instanceof Player victim && trusted.getOrDefault(attacker.getUniqueId(), Set.of()).contains(victim.getUniqueId())) return;
         String[] activeSlots = slots(attacker.getUniqueId());
         Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
         active.remove("");
