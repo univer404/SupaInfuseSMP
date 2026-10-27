@@ -116,6 +116,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private boolean disabled(Player p) { return getConfig().getStringList("settings.disabled-worlds").contains(p.getWorld().getName()); }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("item")) return itemCommand(sender, args);
         if (command.getName().equalsIgnoreCase("trust")) return trustCommand(sender, args);
         if (command.getName().equalsIgnoreCase("control")) return controlCommand(sender, args);
         if (command.getName().equalsIgnoreCase("use")) {
@@ -172,6 +173,30 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             spark(p); return true;
         }
         sender.sendMessage("Usage: /infuse [gui|give|clear|spark|reload]");
+        return true;
+    }
+
+    private boolean itemCommand(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
+        if (!(sender instanceof Player player)) { tell(sender, "player-only"); return true; }
+        if (args.length == 0) { player.sendMessage("/item <effect|all> [true|false]"); return true; }
+        if (args[0].equalsIgnoreCase("all")) {
+            for (String effect : EFFECTS) {
+                if (effect.equals("earth")) continue;
+                if (effect.equals("ender")) {
+                    player.getInventory().addItem(createEffectItem(effect, true));
+                } else {
+                    player.getInventory().addItem(createEffectItem(effect, false));
+                    player.getInventory().addItem(createEffectItem(effect, true));
+                }
+            }
+            return true;
+        }
+        String effect = clean(args[0]);
+        if (!EFFECTS.contains(effect)) { tell(sender, "unknown-effect"); return true; }
+        boolean isAugmented = (args.length > 1 && Boolean.parseBoolean(args[1])) || effect.equals("earth") || effect.equals("ender");
+        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(createEffectItem(effect, isAugmented));
+        leftovers.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
         return true;
     }
 
@@ -792,6 +817,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
     }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (command.getName().equalsIgnoreCase("item")) return args.length == 1 ? EFFECTS.stream().filter(value -> value.startsWith(args[0].toLowerCase(Locale.ROOT))).toList() : List.of("true", "false");
         if (command.getName().equalsIgnoreCase("trust")) return args.length == 1 ? List.of("add", "remove", "list", "clear") : args.length == 2 ? Bukkit.getOnlinePlayers().stream().map(Player::getName).toList() : List.of();
         if (command.getName().equalsIgnoreCase("control")) return args.length == 1 ? List.of("primary", "secondary") : args.length == 2 ? List.of("swap", "drop", "sneak", "sneak-drop", "sneak-swap", "none") : List.of();
         if (command.getName().equalsIgnoreCase("use")) return args.length == 1 ? List.of("primary", "secondary", "p", "s") : List.of();
