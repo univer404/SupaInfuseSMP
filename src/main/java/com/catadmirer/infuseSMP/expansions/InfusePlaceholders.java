@@ -1,6 +1,6 @@
-package com.catadmirer.infuseSMP.expansions;
+package com.supainfuse.smp.expansions;
 
-import com.catadmirer.infuseSMP.Infuse;
+import com.supainfuse.smp.Infuse;
 
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.OfflinePlayer;
