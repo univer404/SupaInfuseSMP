@@ -11,6 +11,8 @@ settings:
   do-roll-animation: true
   roll-first-join: false
   head-drop: false
+  use-sound: "custom.activate"
+  recharge-sound: "custom.health"
   resource-pack:
     enabled: true
     url: "https://raw.githubusercontent.com/o-hex/InfuseS3/main/_texturepack.zip"
