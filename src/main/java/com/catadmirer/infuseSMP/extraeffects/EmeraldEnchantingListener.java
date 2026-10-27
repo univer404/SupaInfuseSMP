@@ -62,7 +62,9 @@ public final class EmeraldEnchantingListener implements Listener {
         }
         List<Map<Enchantment, Integer>> offers = pendingOffers.remove(player.getUniqueId());
         if (offers == null || offers.isEmpty()) return;
-        int selected = Math.max(0, Math.min(offers.size() - 1, event.getWhichButton()));
+        int displayedCost = event.getExpLevelCost();
+        int selected = displayedCost <= OFFER_COSTS[0] ? 0 : displayedCost <= OFFER_COSTS[1] ? 1 : 2;
+        selected = Math.max(0, Math.min(offers.size() - 1, selected));
         Map<Enchantment, Integer> chosen = offers.get(selected);
         if (chosen.isEmpty()) return;
         event.getEnchantsToAdd().clear();
