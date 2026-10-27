@@ -1767,15 +1767,63 @@ public final class Infuse extends JavaPlugin {
         return Registry.ENCHANTMENT.get(NamespacedKey.minecraft(key));
     }
 
+    private void updateEffectToolEnchantments(Player player, Set<String> active) {
+        ItemStack[] heldItems = {player.getInventory().getItemInMainHand(), player.getInventory().getItemInOffHand()};
+        for (ItemStack item : heldItems) {
+            if (item == null || item.getType() == Material.AIR) continue;
+            org.bukkit.enchantments.Enchantment looting = enchantment("looting");
+            org.bukkit.enchantments.Enchantment fortune = enchantment("fortune");
+            org.bukkit.enchantments.Enchantment unbreaking = enchantment("unbreaking");
+            org.bukkit.enchantments.Enchantment loyalty = enchantment("loyalty");
+
+            if (active.contains("emerald") && isLootingTool(item)) applyToolEnchant(item, looting, 5);
+            else removeEnchantIfLevel(item, looting, 5);
+
+            if (active.contains("haste") && isHasteTool(item)) {
+                applyToolEnchant(item, unbreaking, 10);
+                if (isFortuneTool(item)) applyToolEnchant(item, fortune, 5);
+            } else {
+                removeEnchantIfLevel(item, unbreaking, 10);
+                removeEnchantIfLevel(item, fortune, 5);
+            }
+
+            if (active.contains("ocean") && item.getType() == Material.TRIDENT) applyToolEnchant(item, loyalty, 5);
+            else removeEnchantIfLevel(item, loyalty, 5);
+        }
+    }
+
+    private boolean isLootingTool(ItemStack item) {
+        String type = item.getType().name();
+        return type.endsWith("_SWORD") || type.endsWith("_AXE");
+    }
+
+    private boolean isFortuneTool(ItemStack item) {
+        String type = item.getType().name();
+        return type.endsWith("_PICKAXE") || type.endsWith("_SHOVEL") || type.endsWith("_HOE");
+    }
+
+    private boolean isHasteTool(ItemStack item) {
+        return isLootingTool(item) || isFortuneTool(item);
+    }
+
+    private void removeEnchantIfLevel(ItemStack item, org.bukkit.enchantments.Enchantment enchantment, int customLevel) {
+        if (item == null || enchantment == null || !item.containsEnchantment(enchantment)) return;
+        if (item.getEnchantmentLevel(enchantment) == customLevel) item.removeEnchantment(enchantment);
+    }
+
     private void applyToolEnchant(ItemStack item, org.bukkit.enchantments.Enchantment enchantment, int level) {
         if (item == null || item.getType() == Material.AIR || enchantment == null) return;
         boolean overwrite = getConfig().getBoolean("settings.overwrite-enchants", true);
         if (!overwrite && item.containsEnchantment(enchantment)) return;
-        if (item.getType().name().endsWith("_SWORD") || item.getType().name().endsWith("_AXE") ||
-                item.getType().name().endsWith("_PICKAXE") || item.getType().name().endsWith("_SHOVEL") ||
-                item.getType().name().endsWith("_HOE") || item.getType() == Material.SHEARS || item.getType() == Material.TRIDENT) {
-            item.addUnsafeEnchantment(enchantment, level);
-        }
+        String key = enchantment.getKey().getKey();
+        boolean supported = switch (key) {
+            case "looting" -> isLootingTool(item);
+            case "fortune" -> isFortuneTool(item);
+            case "unbreaking" -> isHasteTool(item);
+            case "loyalty" -> item.getType() == Material.TRIDENT;
+            default -> false;
+        };
+        if (supported) item.addUnsafeEnchantment(enchantment, level);
     }
 
     private void healTrustedNearby(Player caster, double radius, double amount) {
@@ -1892,6 +1940,7 @@ public final class Infuse extends JavaPlugin {
             }
             Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
             active.remove("");
+            updateEffectToolEnchantments(player, active);
             if (!active.contains("speed")) clearSpeedStack(player);
             if (!active.contains("haste")) { clearHasteStack(player); updateHasteBreakSpeed(player, false); }
             if (!active.contains("feather")) clearWindChargeVisuals(player.getUniqueId());
@@ -1900,8 +1949,6 @@ public final class Infuse extends JavaPlugin {
                 decayHasteStack(player);
                 updateHasteBreakSpeed(player, true);
                 player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 0, true, false, true));
-                applyToolEnchant(player.getInventory().getItemInMainHand(), enchantment("fortune"), 5);
-                applyToolEnchant(player.getInventory().getItemInMainHand(), enchantment("unbreaking"), 10);
             }
             if (active.contains("strength")) player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 40, 0, true, false, true));
             if (active.contains("regeneration")) player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 0, true, false, true));
@@ -1920,18 +1967,10 @@ public final class Infuse extends JavaPlugin {
             }
             if (active.contains("emerald")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, 40, 2, true, false, true));
-                ItemStack weapon = player.getInventory().getItemInMainHand();
-                if (weapon != null && (weapon.getType().name().endsWith("_SWORD") || weapon.getType().name().endsWith("_AXE"))) {
-                    applyToolEnchant(weapon, enchantment("looting"), 5);
-                }
             }
             if (active.contains("ocean")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, 40, 0, true, false, true));
                 if (player.isInWater()) player.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, 40, 0, true, false, true));
-                ItemStack heldItem = player.getInventory().getItemInMainHand();
-                if (heldItem.getType() == Material.TRIDENT) applyToolEnchant(heldItem, enchantment("loyalty"), 5);
-                ItemStack offhandItem = player.getInventory().getItemInOffHand();
-                if (offhandItem.getType() == Material.TRIDENT) applyToolEnchant(offhandItem, enchantment("loyalty"), 5);
             }
             if (active.contains("frost")) {
                 player.setFreezeTicks(0);
