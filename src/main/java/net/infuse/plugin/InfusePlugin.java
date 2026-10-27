@@ -476,6 +476,56 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     String display(String effect) { return effect == null || effect.isBlank() ? "None" : title(effect); }
 
     @EventHandler
+    public void convertFireSnowballs(PlayerInteractEvent event) {
+        if (event.getItem() == null || event.getItem().getType() != Material.SNOWBALL || !event.getAction().isRightClick()) return;
+        Player player = event.getPlayer();
+        if (disabled(player) || !Arrays.asList(slots(player.getUniqueId())).contains("fire")) return;
+        String key = player.getUniqueId() + ":fire-snowball";
+        long now = System.currentTimeMillis();
+        long until = cooldowns.getOrDefault(key, 0L);
+        if (until > now) {
+            event.setCancelled(true);
+            player.sendMessage(mini.deserialize("<red>Fireball is on cooldown for " + ((until - now + 999) / 1000) + "s."));
+            return;
+        }
+        event.setCancelled(true);
+        long cooldown = Math.max(0, getConfig().getLong("effects.fire.snowball-cooldown-seconds", 15));
+        cooldowns.put(key, now + cooldown * 1000L);
+        org.bukkit.inventory.EquipmentSlot hand = event.getHand();
+        ItemStack held = hand == org.bukkit.inventory.EquipmentSlot.OFF_HAND ? player.getInventory().getItemInOffHand() : player.getInventory().getItemInMainHand();
+        if (held.getAmount() > 1) held.setAmount(held.getAmount() - 1);
+        else {
+            if (hand == org.bukkit.inventory.EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(null);
+            else player.getInventory().setItemInMainHand(null);
+        }
+        org.bukkit.entity.SmallFireball fireball = player.getWorld().spawn(player.getEyeLocation(), org.bukkit.entity.SmallFireball.class);
+        fireball.setShooter(player);
+        fireball.setVelocity(player.getLocation().getDirection().multiply(2.0));
+        fireball.setIsIncendiary(true);
+        fireball.setYield(1.0f);
+        player.playSound(player.getLocation(), "entity.blaze.shoot", 0.8f, 1.2f);
+    }
+
+    @EventHandler
+    public void infuseTridentEffects(org.bukkit.event.entity.ProjectileHitEvent event) {
+        if (!(event.getEntity() instanceof org.bukkit.entity.Trident trident) || !(trident.getShooter() instanceof Player player) || disabled(player)) return;
+        if (Arrays.asList(slots(player.getUniqueId())).contains("thunder")) {
+            String key = player.getUniqueId() + ":thunder-trident";
+            long now = System.currentTimeMillis();
+            if (cooldowns.getOrDefault(key, 0L) <= now) {
+                cooldowns.put(key, now + Math.max(0, getConfig().getLong("effects.thunder.trident-cooldown-seconds", 10)) * 1000L);
+                org.bukkit.Location hitLocation = event.getHitEntity() != null ? event.getHitEntity().getLocation() : event.getHitBlock() != null ? event.getHitBlock().getLocation() : trident.getLocation();
+                player.getWorld().strikeLightning(hitLocation);
+            }
+        }
+        if (Arrays.asList(slots(player.getUniqueId())).contains("ocean") && event.getHitEntity() instanceof Player target &&
+                !trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(target.getUniqueId())) {
+            org.bukkit.util.Vector pull = player.getLocation().toVector().subtract(target.getLocation().toVector()).normalize().multiply(getConfig().getDouble("effects.ocean.trident-pull-coefficient", 0.27));
+            target.setVelocity(target.getVelocity().add(pull));
+        }
+    }
+
+    @EventHandler
     public void onEffectPotionConsume(org.bukkit.event.player.PlayerItemConsumeEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
