@@ -451,6 +451,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         if (item == null) return;
         String encoded = item.hasItemMeta() ? item.getItemMeta().getPersistentDataContainer().get(effectKey, PersistentDataType.STRING) : null;
         if (encoded == null) {
+            if (disabled(player)) return;
             String[] activeSlots = slots(player.getUniqueId());
             if (Arrays.asList(activeSlots).contains("heart")) {
                 boolean goldenApple = item.getType() == Material.ENCHANTED_GOLDEN_APPLE;
@@ -480,6 +481,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @EventHandler
     public void onExperienceGain(org.bukkit.event.player.PlayerExpChangeEvent event) {
+        if (disabled(event.getPlayer())) return;
         String[] activeSlots = slots(event.getPlayer().getUniqueId());
         if (!Arrays.asList(activeSlots).contains("emerald")) return;
         int multiplier = sparkEnds.getOrDefault(event.getPlayer().getUniqueId() + ":emerald", 0L) > System.currentTimeMillis() ? 4 : 2;
