@@ -38,7 +38,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class Infuse extends JavaPlugin {
-    static final List<String> EFFECTS = EffectRegistry.playableEffects();
+    public static final List<String> EFFECTS = EffectRegistry.playableEffects();
     private static final List<String> ICON_EFFECTS = EffectRegistry.iconEffects();
     private final MiniMessage mini = MiniMessage.miniMessage();
     private final Map<UUID, String[]> equipped = new HashMap<>();
@@ -165,7 +165,7 @@ public final class Infuse extends JavaPlugin {
     }
     private void tell(CommandSender sender, String key) { sender.sendMessage(mini.deserialize(message(key))); }
     private String clean(String s) { return s == null ? "" : s.toLowerCase(Locale.ROOT); }
-    String[] slots(UUID id) { return equipped.computeIfAbsent(id, ignored -> new String[]{"", ""}); }
+    public String[] slots(UUID id) { return equipped.computeIfAbsent(id, ignored -> new String[]{"", ""}); }
     private boolean disabled(Player p) {
         if (getConfig().getStringList("settings.disabled-worlds").contains(p.getWorld().getName())) return true;
         return regionManager != null && regionManager.isDisabled(p.getLocation());
@@ -698,7 +698,7 @@ public final class Infuse extends JavaPlugin {
         return item;
     }
     public String title(String effect) { return effect.substring(0,1).toUpperCase(Locale.ROOT)+effect.substring(1); }
-    String display(String effect) { return effect == null || effect.isBlank() ? "None" : title(effect); }
+    public String display(String effect) { return effect == null || effect.isBlank() ? "None" : title(effect); }
 
     @EventHandler
     public void convertFireSnowballs(PlayerInteractEvent event) {
