@@ -29,6 +29,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final MiniMessage mini = MiniMessage.miniMessage();
     private final Map<UUID, String[]> equipped = new HashMap<>();
     private final Map<UUID, boolean[]> augmented = new HashMap<>();
+    private final Map<UUID, String[]> controls = new HashMap<>();
     private final Map<UUID, Set<UUID>> trusted = new HashMap<>();
     private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
@@ -71,6 +72,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 UUID uuid = UUID.fromString(id);
                 equipped.put(uuid, new String[]{data.getString(id + ".primary", ""), data.getString(id + ".secondary", "")});
                 augmented.put(uuid, new boolean[]{data.getBoolean(id + ".primary-augmented", false), data.getBoolean(id + ".secondary-augmented", false)});
+                controls.put(uuid, new String[]{data.getString(id + ".primary-bind", "none"), data.getString(id + ".secondary-bind", "none")});
                 Set<UUID> list = new HashSet<>();
                 for (String friend : data.getStringList(id + ".trusted")) try { list.add(UUID.fromString(friend)); } catch (IllegalArgumentException ignored) {}
                 trusted.put(uuid, list);
@@ -90,6 +92,9 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             boolean[] isAugmented = augmented.getOrDefault(id, new boolean[]{false, false});
             getConfig().set(path + ".primary-augmented", isAugmented[0]);
             getConfig().set(path + ".secondary-augmented", isAugmented[1]);
+            String[] control = controls.getOrDefault(id, new String[]{"none", "none"});
+            getConfig().set(path + ".primary-bind", control[0]);
+            getConfig().set(path + ".secondary-bind", control[1]);
             getConfig().set(path + ".trusted", trusted.getOrDefault(id, Set.of()).stream().map(UUID::toString).toList());
         }
         saveConfig();
@@ -108,6 +113,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("trust")) return trustCommand(sender, args);
+        if (command.getName().equalsIgnoreCase("control")) return controlCommand(sender, args);
         if (command.getName().equalsIgnoreCase("use")) {
             if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
             String slot = args.length == 0 ? "primary" : args[0].equalsIgnoreCase("p") ? "primary" : args[0].equalsIgnoreCase("s") ? "secondary" : args[0].toLowerCase(Locale.ROOT);
@@ -228,6 +234,22 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         augmented.put(target.getUniqueId(), nextAug);
         saveData();
         sender.sendMessage(mini.deserialize("<green>Applied " + (isAugmented ? "augmented " : "") + title(effect) + " to " + target.getName() + "."));
+        return true;
+    }
+
+    private boolean controlCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) { tell(sender, "player-only"); return true; }
+        if (args.length < 2) { player.sendMessage("Usage: /control <primary|secondary> <swap|drop|sneak|sneak-drop|sneak-swap|none>"); return true; }
+        String slot = args[0].equalsIgnoreCase("p") ? "primary" : args[0].equalsIgnoreCase("s") ? "secondary" : args[0].toLowerCase(Locale.ROOT);
+        String action = args[1].toLowerCase(Locale.ROOT);
+        if (!slot.equals("primary") && !slot.equals("secondary")) { player.sendMessage("Slot must be primary or secondary."); return true; }
+        if (!List.of("swap", "drop", "sneak", "sneak-drop", "sneak-swap", "none").contains(action)) {
+            player.sendMessage("Action must be swap, drop, sneak, sneak-drop, sneak-swap, or none."); return true;
+        }
+        String[] values = controls.computeIfAbsent(player.getUniqueId(), ignored -> new String[]{"none", "none"});
+        values[slot.equals("primary") ? 0 : 1] = action;
+        saveData();
+        player.sendMessage(mini.deserialize("<green>Bound " + slot + " Spark to <white>" + action + "<green>."));
         return true;
     }
 
@@ -531,6 +553,34 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         hitCounters.put(key, count);
         return count;
     }
+    @EventHandler public void dropControl(PlayerDropItemEvent event) {
+        Player player = event.getPlayer();
+        String action = player.isSneaking() ? "sneak-drop" : "drop";
+        triggerBoundSpark(player, action, event);
+    }
+
+    @EventHandler public void swapControl(PlayerSwapHandItemsEvent event) {
+        Player player = event.getPlayer();
+        String action = player.isSneaking() ? "sneak-swap" : "swap";
+        triggerBoundSpark(player, action, event);
+    }
+
+    @EventHandler public void sneakControl(PlayerToggleSneakEvent event) {
+        if (!event.isSneaking()) return;
+        triggerBoundSpark(event.getPlayer(), "sneak", event);
+    }
+
+    private void triggerBoundSpark(Player player, String action, org.bukkit.event.Cancellable event) {
+        String[] configured = controls.getOrDefault(player.getUniqueId(), new String[]{"none", "none"});
+        for (int i = 0; i < configured.length; i++) {
+            if (configured[i].equalsIgnoreCase(action)) {
+                event.setCancelled(true);
+                spark(player, i == 0 ? "primary" : "secondary");
+                return;
+            }
+        }
+    }
+
     @EventHandler public void join(PlayerJoinEvent e) {
         slots(e.getPlayer().getUniqueId());
         String url=getConfig().getString("settings.resource-pack.url","");
