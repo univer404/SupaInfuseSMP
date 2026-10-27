@@ -1,6 +1,6 @@
-package com.catadmirer.infuseSMP.extraeffects;
+package com.supainfuse.smp.extraeffects;
 
-import com.catadmirer.infuseSMP.Infuse;
+import com.supainfuse.smp.Infuse;
 import org.bukkit.Registry;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.enchantments.EnchantmentOffer;
