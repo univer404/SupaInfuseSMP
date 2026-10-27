@@ -127,7 +127,10 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         if (command.getName().equalsIgnoreCase("item")) return itemCommand(sender, args);
         if (command.getName().equalsIgnoreCase("ldrain") || command.getName().equalsIgnoreCase("pdrain")) return drainEffect(sender, "primary");
         if (command.getName().equalsIgnoreCase("rdrain") || command.getName().equalsIgnoreCase("sdrain")) return drainEffect(sender, "secondary");
-        if (command.getName().equalsIgnoreCase("trust")) return trustCommand(sender, args);
+        if (command.getName().equalsIgnoreCase("trust")) {
+            if (label.equalsIgnoreCase("untrust") && args.length > 0) return trustCommand(sender, new String[]{"remove", args[0]});
+            return trustCommand(sender, args);
+        }
         if (command.getName().equalsIgnoreCase("control")) return controlCommand(sender, args);
         if (command.getName().equalsIgnoreCase("use")) {
             if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
