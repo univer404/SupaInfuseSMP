@@ -42,6 +42,10 @@ commands:
     description: Return the secondary effect as an item.
     usage: /rdrain
     aliases: [sdrain]
+  conf:
+    description: Read and update Infuse configuration values.
+    usage: /conf <get|set|list> ...
+    permission: infuse.admin
 permissions:
   infuse.admin:
     description: Manage Infuse settings and items.
