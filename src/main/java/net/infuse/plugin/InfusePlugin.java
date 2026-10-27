@@ -511,6 +511,14 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     }
 
     @EventHandler
+    public void invisibilityRangedHit(org.bukkit.event.entity.ProjectileHitEvent event) {
+        if (!(event.getEntity().getShooter() instanceof Player shooter) || !(event.getHitEntity() instanceof org.bukkit.entity.LivingEntity target) || disabled(shooter)) return;
+        if (!Arrays.asList(slots(shooter.getUniqueId())).contains("invisibility")) return;
+        if (target instanceof Player victim && trusted.getOrDefault(shooter.getUniqueId(), Set.of()).contains(victim.getUniqueId())) return;
+        target.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 200, 0, true, false, true));
+    }
+
+    @EventHandler
     public void infuseTridentEffects(org.bukkit.event.entity.ProjectileHitEvent event) {
         if (!(event.getEntity() instanceof org.bukkit.entity.Trident trident) || !(trident.getShooter() instanceof Player player) || disabled(player)) return;
         if (Arrays.asList(slots(player.getUniqueId())).contains("thunder")) {
