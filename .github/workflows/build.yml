@@ -58,6 +58,58 @@ jobs:
               print(f"pack.mcmeta: {json.dumps(pack_meta, ensure_ascii=False)}")
               print(f"Entries: {len(archive.namelist())}")
           PY
+      - name: Prepare Minecraft 1.21.11 texture pack
+        run: |
+          python - <<'PY'
+          import hashlib, io, json, urllib.request, zipfile
+          source_url = "https://raw.githubusercontent.com/o-hex/InfuseS3/main/_texturepack.zip"
+          request = urllib.request.Request(source_url, headers={"User-Agent": "SupaInfuseSMP-pack-builder"})
+          with urllib.request.urlopen(request, timeout=30) as response:
+              original = response.read()
+          original_sha1 = hashlib.sha1(original).hexdigest()
+          expected_original_sha1 = "2a4079e2f08424192e4ee8b8d3df26d1f386cd15"
+          if original_sha1 != expected_original_sha1:
+              raise SystemExit(f"Upstream pack changed: expected {expected_original_sha1}, got {original_sha1}")
+          source = zipfile.ZipFile(io.BytesIO(original))
+          if "pack.mcmeta" not in source.namelist():
+              raise SystemExit("Original texture pack is missing root pack.mcmeta.")
+          metadata = json.loads(source.read("pack.mcmeta"))
+          pack = metadata.setdefault("pack", {})
+          old_format = pack.get("pack_format", "modern metadata")
+          pack["pack_format"] = 75
+          pack["description"] = "InfuseSMP resource pack - updated metadata for Minecraft 1.21.11"
+          output = io.BytesIO()
+          with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
+              for info in source.infolist():
+                  data = source.read(info.filename)
+                  if info.filename == "pack.mcmeta":
+                      data = (json.dumps(metadata, ensure_ascii=False, indent=2) + "\\n").encode("utf-8")
+                  target.writestr(info, data)
+          result = output.getvalue()
+          with zipfile.ZipFile(io.BytesIO(result)) as check:
+              bad = check.testzip()
+              if bad:
+                  raise SystemExit(f"Generated pack has corrupt entry: {bad}")
+              checked_metadata = json.loads(check.read("pack.mcmeta"))
+              if checked_metadata.get("pack", {}).get("pack_format") != 75:
+                  raise SystemExit("Generated pack metadata does not declare pack_format 75.")
+          import os
+          os.makedirs("target", exist_ok=True)
+          output_path = "target/Infuse-Texture-Pack-1.21.11.zip"
+          with open(output_path, "wb") as f:
+              f.write(result)
+          print(f"Updated pack metadata from {old_format} to 75.")
+          print(f"Original SHA-1: {original_sha1}")
+          print(f"NEW_PACK_SHA1={hashlib.sha1(result).hexdigest()}")
+          print(f"Output: {output_path} ({len(result)} bytes)")
+          PY
+      - name: Upload updated texture pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infuse-Texture-Pack-1.21.11
+          path: target/Infuse-Texture-Pack-1.21.11.zip
+          if-no-files-found: error
+          retention-days: 14
       - name: Build plugin
         run: mvn --batch-mode --no-transfer-progress clean package
       - name: Upload plugin
