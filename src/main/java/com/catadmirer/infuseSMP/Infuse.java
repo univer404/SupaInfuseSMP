@@ -844,7 +844,6 @@ public final class Infuse extends JavaPlugin {
 
     private void transferExperience(Player from, Player to, int amount) {
         if (amount <= 0) return;
-        UUID fromId = from.getUniqueId(), toId = to.getUniqueId();
         from.giveExp(-amount);
         to.giveExp(amount);
     }
