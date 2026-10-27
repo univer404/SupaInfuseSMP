@@ -29,6 +29,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final MiniMessage mini = MiniMessage.miniMessage();
     private final Map<UUID, String[]> equipped = new HashMap<>();
     private final Map<UUID, Set<UUID>> trusted = new HashMap<>();
+    private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private NamespacedKey effectKey;
     private Inventory mainMenu;
@@ -202,16 +203,13 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @EventHandler public void inventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-        if (e.getView().title().equals(mainMenu == null ? null : mainMenu.getViewers().isEmpty() ? null : e.getView().title())) {
-            // The actual menu is identified by its title below; avoid depending on a shared inventory instance.
-        }
         String title = mini.serialize(e.getView().title());
         if (title.contains("Infuse") && !title.contains("Choose an Effect")) {
             e.setCancelled(true);
             if (e.getRawSlot() == 22) { p.closeInventory(); return; }
             if (e.getRawSlot() == 13) { openEffects(p, 0); return; }
-            if (e.getRawSlot() == 11) { openEffects(p, 0); return; }
-            if (e.getRawSlot() == 15) { openEffects(p, 1); return; }
+            if (e.getRawSlot() == 11) { selectionMode.put(p.getUniqueId(), 0); openEffects(p, 0); return; }
+            if (e.getRawSlot() == 15) { selectionMode.put(p.getUniqueId(), 1); openEffects(p, 1); return; }
         } else if (title.contains("Choose an Effect")) {
             e.setCancelled(true);
             if (e.getRawSlot() == 49) { p.closeInventory(); return; }
@@ -220,8 +218,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             String encoded=clicked.getItemMeta().getPersistentDataContainer().get(effectKey,PersistentDataType.STRING);
             if(encoded==null) return;
             String effect=encoded.split(":")[0]; String[] slots=slots(p.getUniqueId());
-            int target=0; // selection mode is remembered on the player inventory title metadata below
-            target = getConfig().getString("runtime.selection." + p.getUniqueId(), "primary").equals("secondary") ? 1 : 0;
+            int target = selectionMode.getOrDefault(p.getUniqueId(), 0);
             slots[target]=effect;
             saveData(); p.sendMessage(mini.deserialize("<green>Equipped <white>"+title(effect)+"<green> in "+(target==0?"primary":"secondary")+" slot."));
             openMain(p);
@@ -255,7 +252,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             case "ocean" -> { p.setRemainingAir(p.getMaximumAir()); p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE,100,0,true,false,true)); }
             case "frost" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,100,1,true,false,true));
             case "emerald" -> p.giveExp(10);
-            case "ender" -> { p.addPotionEffect(new PotionEffect(PotionEffectType.TELEPORT,40,0,true,false,true)); }
+            case "ender" -> { org.bukkit.Location destination = p.getTargetBlockExact(24) == null ? null : p.getTargetBlockExact(24).getLocation().add(0.5, 1, 0.5); if (destination != null && destination.getWorld() == p.getWorld()) p.teleport(destination); }
             case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,100,1,true,false,true));
         }
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
