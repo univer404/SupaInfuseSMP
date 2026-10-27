@@ -1,18 +1,28 @@
+# ============================================================
+# Infuse configuration
+# Edit this file while the server is stopped, then restart it.
+# Times ending in "-seconds" are seconds; values ending in
+# "-ticks" are Minecraft ticks (20 ticks = 1 second).
+# ============================================================
+
+# GENERAL SETTINGS
+# Worlds listed here will not allow Infuse effects.
+# Use the exact world folder names from your server.
 settings:
   disabled-worlds:
     - disabled_world
-  allow-same-effects: false
-  allow-true-damage: true
-  overwrite-enchants: true
-  lock-effects: false
-  primary-effects: [heart, strength, regeneration, haste, invisibility, frost, thunder, feather]
-  secondary-effects: [speed, fire, ocean, emerald]
-  trust-list-max: 3
-  trust-list-delay-seconds: 10
+  # If true, the same effect may be equipped in both slots.\n  allow-same-effects: false
+  # Allow Infuse abilities to deal damage that bypasses normal armor reduction.\n  allow-true-damage: true
+  # Allow Infuse crafting to replace existing enchantments when required.\n  overwrite-enchants: true
+  # Prevent normal effect changes when enabled.\n  lock-effects: false
+  # Effects allowed in the primary slot of the Infuse menu.\n  primary-effects: [heart, strength, regeneration, haste, invisibility, frost, thunder, feather]
+  # Effects allowed in the secondary slot of the Infuse menu.\n  secondary-effects: [speed, fire, ocean, emerald]
+  # Maximum number of players a user can trust.\n  trust-list-max: 3
+  # Delay between trust-list changes, in seconds.\n  trust-list-delay-seconds: 10
   recent-damage-window-seconds: 30
-  do-roll-animation: true
-  roll-first-join: false
-  head-drop: false
+  # Play the effect-roll animation when selecting an effect.\n  do-roll-animation: true
+  # Play the roll animation for new players.\n  roll-first-join: false
+  # Drop player heads when the relevant death condition is met.\n  head-drop: false
   use-sound: "custom.activate"
   recharge-sound: "custom.health"
   resource-pack:
