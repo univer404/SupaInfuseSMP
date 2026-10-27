@@ -33,6 +33,14 @@ commands:
     usage: /item <effect|all> [true|false]
     aliases: [giveitem, i, potion, pot]
     permission: infuse.admin
+  ldrain:
+    description: Return the primary effect as an item.
+    usage: /ldrain
+    aliases: [pdrain]
+  rdrain:
+    description: Return the secondary effect as an item.
+    usage: /rdrain
+    aliases: [sdrain]
 permissions:
   infuse.admin:
     description: Manage Infuse settings and items.
