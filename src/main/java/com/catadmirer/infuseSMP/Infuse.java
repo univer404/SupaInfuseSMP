@@ -10,7 +10,6 @@ import com.catadmirer.infuseSMP.gui.CraftingGui;
 import com.catadmirer.infuseSMP.gui.InfuseGui;
 import com.catadmirer.infuseSMP.gui.RecipeBookGui;
 import com.catadmirer.infuseSMP.util.regions.RegionManager;
-import com.catadmirer.infuseSMP.util.regions.WorldGuardRegionManager;
 import com.catadmirer.infuseSMP.expansions.InfusePlaceholders;
 import com.catadmirer.infuseSMP.commands.InfuseCommandHandler;
 import com.catadmirer.infuseSMP.listeners.DamageListener;
@@ -102,7 +101,14 @@ public final class Infuse extends JavaPlugin {
         sparkAbilityManager = new SparkAbilityManager(this);
         gui = new InfuseGui(this);
         recipeGui = new RecipeBookGui(this);
-        if (Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) regionManager = new WorldGuardRegionManager(this);
+        if (Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) {
+            try {
+                Class<?> implementation = Class.forName("com.catadmirer.infuseSMP.util.regions.WorldGuardRegionManager");
+                regionManager = (RegionManager) implementation.getConstructor(Infuse.class).newInstance(this);
+            } catch (ReflectiveOperationException | LinkageError exception) {
+                getLogger().warning("WorldGuard integration could not be loaded: " + exception.getMessage());
+            }
+        }
         loadData();
         if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             new InfusePlaceholders(this).register();
