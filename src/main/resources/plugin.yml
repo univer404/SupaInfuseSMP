@@ -46,6 +46,10 @@ commands:
     description: Read and update Infuse configuration values.
     usage: /conf <get|set|list> ...
     permission: infuse.admin
+  toggledisplay:
+    description: Toggle the Infuse HUD.
+    usage: /toggledisplay
+    aliases: [td]
   resetcraft:
     description: Reset craft counters for Infuse effects.
     usage: /resetcraft <effect|all>
