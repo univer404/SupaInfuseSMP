@@ -152,7 +152,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             Player target = Bukkit.getPlayerExact(args[1]); String effect = clean(args[2]);
             if (target == null) { tell(sender, "not-player"); return true; }
             if (!EFFECTS.contains(effect)) { tell(sender, "unknown-effect"); return true; }
-            boolean augmented = args.length > 3 && args[3].equalsIgnoreCase("augmented");
+            boolean augmented = (args.length > 3 && args[3].equalsIgnoreCase("augmented")) || effect.equals("earth") || effect.equals("ender");
             target.getInventory().addItem(createEffectItem(effect, augmented));
             return true;
         }
@@ -446,6 +446,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         long cooldownSeconds = Math.max(0, getConfig().getLong("effects." + effect + ".cooldown-seconds", 60));
         int durationTicks = (int) Math.max(1, getConfig().getLong("effects." + effect + ".spark-seconds", 15) * 20L);
         cooldowns.put(key, now + cooldownSeconds * 1000L);
+        p.playSound(p.getLocation(), getConfig().getString("settings.use-sound", "custom.activate"), 1.0f, 1.0f);
         switch (effect) {
             case "speed" -> {
                 org.bukkit.util.Vector direction = p.getLocation().getDirection().setY(0).normalize().multiply(getConfig().getDouble("effects.speed.dash-power", 2.6));
@@ -701,9 +702,13 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
     }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if(command.getName().equalsIgnoreCase("trust")) return args.length==1?List.of("add","remove","list","clear"):args.length==2?Bukkit.getOnlinePlayers().stream().map(Player::getName).toList():List.of();
-        if(args.length==1) return List.of("gui","give","clear","spark","reload","add","remove","get","swap","history").stream().filter(s->s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
-        if(args.length==3 && args[0].equalsIgnoreCase("give")) return EFFECTS;
+        if (command.getName().equalsIgnoreCase("trust")) return args.length == 1 ? List.of("add", "remove", "list", "clear") : args.length == 2 ? Bukkit.getOnlinePlayers().stream().map(Player::getName).toList() : List.of();
+        if (command.getName().equalsIgnoreCase("control")) return args.length == 1 ? List.of("primary", "secondary") : args.length == 2 ? List.of("swap", "drop", "sneak", "sneak-drop", "sneak-swap", "none") : List.of();
+        if (command.getName().equalsIgnoreCase("use")) return args.length == 1 ? List.of("primary", "secondary", "p", "s") : List.of();
+        if (command.getName().equalsIgnoreCase("infuse")) {
+            if (args.length == 1) return List.of("gui", "give", "clear", "spark", "reload", "add", "remove", "get", "history").stream().filter(value -> value.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
+            if (args.length == 3 && args[0].equalsIgnoreCase("give")) return EFFECTS;
+        }
         return List.of();
     }
 }
