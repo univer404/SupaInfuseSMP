@@ -30,6 +30,10 @@ effects:
     no-consume-chance: 0.5
     spark-no-consume-chance: 0.75
     spark-xp-gain: 2
+    trigger-hits: 10
+    xp-share-amount: 1
+    xp-steal-amount: 2
+    hit-item-cooldown-ticks: 100
   feather:
     color: "#BEA3CA"
     cooldown-seconds: 60
@@ -77,6 +81,7 @@ effects:
     egap-absorption-tier: 4
     food-absorption-duration-ticks: 1200
     spark-heal-percentage: 0.2
+    return-after-hit: 10.0
   invisibility:
     color: "#7E00FC"
     cooldown-seconds: 60
