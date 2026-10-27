@@ -152,7 +152,7 @@ effects:
     hit-duration-ticks: 60
     trigger-hits: 10
     food-nutrition: 3
-    food-saturation: 0.0
+    food-saturation: 3.0
     effect-hit-amplifier: 1
   speed:
     color: "#D1A44B"
