@@ -128,6 +128,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("conf")) return configCommand(sender, args);
+        if (command.getName().equalsIgnoreCase("resetcooldown")) return resetCooldownCommand(sender, args);
+        if (command.getName().equalsIgnoreCase("resetcraft")) return resetCraftCommand(sender, args);
         if (command.getName().equalsIgnoreCase("item")) return itemCommand(sender, args);
         if (command.getName().equalsIgnoreCase("ldrain") || command.getName().equalsIgnoreCase("pdrain")) return drainEffect(sender, "primary");
         if (command.getName().equalsIgnoreCase("rdrain") || command.getName().equalsIgnoreCase("sdrain")) return drainEffect(sender, "secondary");
@@ -229,6 +231,46 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         List<String> history = historyMap.computeIfAbsent(playerId, ignored -> new ArrayList<>());
         history.add(effect + ":" + isAugmented + ":" + System.currentTimeMillis());
         while (history.size() > 30) history.remove(0);
+    }
+
+    private boolean resetCooldownCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) { tell(sender, "player-only"); return true; }
+        String[] current = slots(player.getUniqueId());
+        int[] selected = args.length > 0 && args[0].equalsIgnoreCase("primary") ? new int[]{0}
+                : args.length > 0 && args[0].equalsIgnoreCase("secondary") ? new int[]{1} : new int[]{0, 1};
+        for (int index : selected) {
+            String effect = current[index];
+            if (effect == null || effect.isBlank()) continue;
+            String key = player.getUniqueId() + ":" + effect;
+            if (sparkEnds.getOrDefault(key, 0L) > System.currentTimeMillis()) {
+                player.sendMessage(mini.deserialize("<red>Your " + (index == 0 ? "primary" : "secondary") + " Spark is still active; wait for it to end."));
+                return true;
+            }
+        }
+        for (int index : selected) {
+            String effect = current[index];
+            if (effect != null && !effect.isBlank()) cooldowns.remove(player.getUniqueId() + ":" + effect);
+        }
+        player.sendMessage(mini.deserialize("<green>Reset cooldown for " + (selected.length == 2 ? "both" : selected[0] == 0 ? "primary" : "secondary") + " slot(s)."));
+        return true;
+    }
+
+    private boolean resetCraftCommand(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
+        if (args.length == 0) { sender.sendMessage("/resetcraft <effect|all>"); return true; }
+        if (args[0].equalsIgnoreCase("all")) {
+            getConfig().set("crafting.crafted", null);
+            saveConfig();
+            sender.sendMessage(mini.deserialize("<green>Reset craft counters for all effects."));
+            return true;
+        }
+        String effect = clean(args[0]);
+        if (!EFFECTS.contains(effect)) { tell(sender, "unknown-effect"); return true; }
+        int old = getConfig().getInt("crafting.crafted." + effect, 0);
+        getConfig().set("crafting.crafted." + effect, 0);
+        saveConfig();
+        sender.sendMessage(mini.deserialize("<green>Reset <white>" + title(effect) + "<green> craft counter. Previous value: <white>" + old));
+        return true;
     }
 
     private boolean configCommand(CommandSender sender, String[] args) {
@@ -1232,6 +1274,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
     }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (command.getName().equalsIgnoreCase("resetcooldown")) return args.length == 1 ? List.of("primary", "secondary") : List.of();
+        if (command.getName().equalsIgnoreCase("resetcraft")) return args.length == 1 ? java.util.stream.Stream.concat(EFFECTS.stream(), java.util.stream.Stream.of("all")).toList() : List.of();
         if (command.getName().equalsIgnoreCase("conf")) return args.length == 1 ? List.of("get", "set", "list") : args.length == 2 && args[0].equalsIgnoreCase("list") ? List.of("show", "add", "remove", "clear") : List.of();
         if (command.getName().equalsIgnoreCase("item")) return args.length == 1 ? EFFECTS.stream().filter(value -> value.startsWith(args[0].toLowerCase(Locale.ROOT))).toList() : List.of("true", "false");
         if (command.getName().equalsIgnoreCase("trust")) return args.length == 1 ? List.of("add", "remove", "list", "clear") : args.length == 2 ? Bukkit.getOnlinePlayers().stream().map(Player::getName).toList() : List.of();
