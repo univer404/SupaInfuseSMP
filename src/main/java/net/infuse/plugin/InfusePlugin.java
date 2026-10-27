@@ -439,18 +439,19 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         long now=System.currentTimeMillis(); String key=p.getUniqueId()+":"+effect;
         long until=cooldowns.getOrDefault(key,0L);
         if(until>now) { p.sendMessage(mini.deserialize("<red>That Spark is on cooldown for "+((until-now+999)/1000)+"s.")); return; }
-        long seconds=getConfig().getLong("effects."+effect+".spark-seconds",15);
-        cooldowns.put(key,now+seconds*1000);
+        long cooldownSeconds = Math.max(0, getConfig().getLong("effects." + effect + ".cooldown-seconds", 60));
+        int durationTicks = (int) Math.max(1, getConfig().getLong("effects." + effect + ".spark-seconds", 15) * 20L);
+        cooldowns.put(key, now + cooldownSeconds * 1000L);
         switch(effect) {
-            case "speed","feather" -> p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,100,1,true,false,true));
-            case "haste" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,100,1,true,false,true));
-            case "strength" -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,1,true,false,true));
-            case "regeneration","heart" -> p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,100,1,true,false,true));
-            case "invisibility" -> p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,100,0,true,false,true));
+            case "speed","feather" -> p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,durationTicks,1,true,false,true));
+            case "haste" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,durationTicks,1,true,false,true));
+            case "strength" -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,durationTicks,1,true,false,true));
+            case "regeneration","heart" -> p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,durationTicks,1,true,false,true));
+            case "invisibility" -> p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,durationTicks,0,true,false,true));
             case "fire" -> { p.setFireTicks(0); p.getNearbyEntities(5,3,5).stream().filter(ent -> ent instanceof org.bukkit.entity.LivingEntity).map(ent -> (org.bukkit.entity.LivingEntity)ent).filter(ent -> !ent.equals(p)).forEach(ent -> ent.setFireTicks(100)); }
             case "thunder" -> p.getNearbyEntities(8,5,8).stream().filter(ent -> ent instanceof org.bukkit.entity.LivingEntity).map(ent -> (org.bukkit.entity.LivingEntity)ent).filter(ent -> !ent.equals(p)).forEach(ent -> p.getWorld().strikeLightning(ent.getLocation()));
-            case "ocean" -> { p.setRemainingAir(p.getMaximumAir()); p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE,100,0,true,false,true)); }
-            case "frost" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,100,1,true,false,true));
+            case "ocean" -> { p.setRemainingAir(p.getMaximumAir()); p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE,durationTicks,0,true,false,true)); }
+            case "frost" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,durationTicks,1,true,false,true));
             case "emerald" -> p.giveExp(10);
             case "ender" -> { org.bukkit.Location destination = p.getTargetBlockExact(24) == null ? null : p.getTargetBlockExact(24).getLocation().add(0.5, 1, 0.5); if (destination != null && destination.getWorld() == p.getWorld()) p.teleport(destination); }
             case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,100,1,true,false,true));
