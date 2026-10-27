@@ -3,6 +3,7 @@ package net.infuse.plugin;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.Registry;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -951,8 +952,12 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
     }
 
+    private org.bukkit.enchantments.Enchantment enchantment(String key) {
+        return Registry.ENCHANTMENT.get(NamespacedKey.minecraft(key));
+    }
+
     private void applyToolEnchant(ItemStack item, org.bukkit.enchantments.Enchantment enchantment, int level) {
-        if (item == null || item.getType() == Material.AIR) return;
+        if (item == null || item.getType() == Material.AIR || enchantment == null) return;
         boolean overwrite = getConfig().getBoolean("settings.overwrite-enchants", true);
         if (!overwrite && item.containsEnchantment(enchantment)) return;
         if (item.getType().name().endsWith("_SWORD") || item.getType().name().endsWith("_AXE") ||
@@ -1018,15 +1023,15 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             if (active.contains("speed")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
             if (active.contains("haste")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 0, true, false, true));
-                applyToolEnchant(player.getInventory().getItemInMainHand(), org.bukkit.enchantments.Enchantment.LOOT_BONUS_BLOCKS, 5);
-                applyToolEnchant(player.getInventory().getItemInMainHand(), org.bukkit.enchantments.Enchantment.DURABILITY, 10);
+                applyToolEnchant(player.getInventory().getItemInMainHand(), enchantment("fortune"), 5);
+                applyToolEnchant(player.getInventory().getItemInMainHand(), enchantment("unbreaking"), 10);
             }
             if (active.contains("strength")) player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 40, 0, true, false, true));
             if (active.contains("regeneration")) player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 0, true, false, true));
             if (active.contains("fire")) player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 40, 0, true, false, true));
             if (active.contains("emerald")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, 40, 2, true, false, true));
-                applyToolEnchant(player.getInventory().getItemInMainHand(), org.bukkit.enchantments.Enchantment.LOOT_BONUS_MOBS, 5);
+                applyToolEnchant(player.getInventory().getItemInMainHand(), enchantment("looting"), 5);
             }
             if (active.contains("ocean")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, 40, 0, true, false, true));
