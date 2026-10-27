@@ -65,6 +65,8 @@ public final class Infuse extends JavaPlugin {
     private final Map<String, Long> sparkEnds = new HashMap<>();
     private final Map<UUID, Long> trustActionCooldowns = new HashMap<>();
     private final Set<UUID> invisiblePlayers = new HashSet<>();
+    private final Map<UUID, Set<UUID>> invisibilitySparkOwners = new HashMap<>();
+    private final Map<UUID, BukkitTask> invisibilitySparkTasks = new HashMap<>();
     private final Set<UUID> regenFoodWindow = new HashSet<>();
     private final Map<UUID, Integer> oceanAir = new HashMap<>();
     private final Map<UUID, Long> oceanLastActive = new HashMap<>();
@@ -1579,29 +1581,84 @@ public final class Infuse extends JavaPlugin {
     }
 
     private void activateInvisibility(Player player, int durationTicks) {
-        invisiblePlayers.add(player.getUniqueId());
+        UUID casterId = player.getUniqueId();
+        invisiblePlayers.add(casterId);
         player.setCollidable(false);
-        player.getWorld().spawnParticle(org.bukkit.Particle.SQUID_INK, player.getLocation().add(0, 1, 0), 80, 2.0, 1.0, 2.0, 0.02);
-        for (org.bukkit.entity.Entity entity : player.getNearbyEntities(8, 5, 8)) {
-            if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(player)) continue;
-            if (entity instanceof Player target && trustManager.getTrusted(player.getUniqueId()).contains(target.getUniqueId())) continue;
-            living.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, durationTicks, 0, true, false, true));
-            living.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, durationTicks, 0, true, false, true));
-        }
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (viewer.equals(player) || trustManager.getTrusted(player.getUniqueId()).contains(viewer.getUniqueId())) {
-                viewer.showPlayer(this, player);
-            } else {
-                viewer.hidePlayer(this, player);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, durationTicks, 0, true, false, true));
+        int interval = Math.max(1, getConfig().getInt("effects.invisibility.invis-interval-ticks", 4));
+        int iterations = Math.max(1, (durationTicks + interval - 1) / interval);
+        final int[] elapsed = {0};
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(this, runningTask -> {
+            if (!player.isOnline() || disabled(player) || elapsed[0] >= iterations) {
+                runningTask.cancel();
+                finishInvisibilitySpark(player);
+                return;
+            }
+            elapsed[0]++;
+            double maxRadius = Math.max(1.0, getConfig().getDouble("effects.invisibility.max-spark-radius", 12.0));
+            double baseRadius = Math.max(1.0, getConfig().getDouble("effects.invisibility.base-spark-radius", 8.0));
+            double teammateCoefficient = Math.max(0.0, getConfig().getDouble("effects.invisibility.teammate-coefficient", 1.0));
+            long trustedNearby = player.getWorld().getPlayers().stream()
+                    .filter(target -> !target.equals(player) && !disabled(target))
+                    .filter(target -> trustManager.isTrusted(casterId, target.getUniqueId()))
+                    .filter(target -> target.getLocation().distanceSquared(player.getLocation()) <= maxRadius * maxRadius)
+                    .count();
+            double radius = Math.min(maxRadius, baseRadius + trustedNearby * teammateCoefficient);
+            double radiusSquared = radius * radius;
+            for (Player target : player.getWorld().getPlayers()) {
+                if (target.equals(player) || disabled(target) ||
+                        target.getLocation().distanceSquared(player.getLocation()) > radiusSquared) continue;
+                if (trustManager.isTrusted(casterId, target.getUniqueId())) {
+                    UUID targetId = target.getUniqueId();
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, interval * 2 + 2, 0, true, false, true));
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, interval * 2 + 2, 0, true, false, true));
+                    invisibilitySparkOwners.computeIfAbsent(targetId, ignored -> new HashSet<>()).add(casterId);
+                    for (Player viewer : Bukkit.getOnlinePlayers()) {
+                        if (viewer.equals(player) || viewer.equals(target)) viewer.showPlayer(this, target);
+                        else viewer.hidePlayer(this, target);
+                    }
+                } else {
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, interval * 2 + 2, 0, true, false, true));
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, interval * 2 + 2, 0, true, false, true));
+                }
+            }
+            player.getWorld().spawnParticle(org.bukkit.Particle.SQUID_INK,
+                    player.getLocation().add(0, 1, 0), 12, radius * 0.45, 0.8, radius * 0.45, 0.01);
+        }, 0L, interval);
+        invisibilitySparkTasks.put(casterId, task);
+    }
+
+    private void finishInvisibilitySpark(Player caster) {
+        UUID casterId = caster.getUniqueId();
+        invisibilitySparkTasks.remove(casterId);
+        for (UUID targetId : new HashSet<>(invisibilitySparkOwners.keySet())) {
+            Set<UUID> owners = invisibilitySparkOwners.get(targetId);
+            if (owners == null || !owners.remove(casterId)) continue;
+            if (!owners.isEmpty()) continue;
+            invisibilitySparkOwners.remove(targetId);
+            Player target = Bukkit.getPlayer(targetId);
+            if (target == null) continue;
+            boolean hasPassiveInvisibility = Arrays.asList(slots(targetId)).contains("invisibility");
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                if (!hasPassiveInvisibility || viewer.equals(target) ||
+                        trustManager.isTrusted(targetId, viewer.getUniqueId())) {
+                    viewer.showPlayer(this, target);
+                } else {
+                    viewer.hidePlayer(this, target);
+                }
             }
         }
-        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, durationTicks, 0, true, false, true));
-        Bukkit.getScheduler().runTaskLater(this, () -> {
-            if (Arrays.asList(slots(player.getUniqueId())).contains("invisibility")) return;
-            invisiblePlayers.remove(player.getUniqueId());
-            player.setCollidable(true);
-            for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
-        }, durationTicks);
+        if (!Arrays.asList(slots(casterId)).contains("invisibility")) {
+            invisiblePlayers.remove(casterId);
+            caster.setCollidable(true);
+            for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, caster);
+        }
+    }
+
+    private void stopInvisibilitySpark(Player player) {
+        BukkitTask task = invisibilitySparkTasks.remove(player.getUniqueId());
+        if (task != null) task.cancel();
+        finishInvisibilitySpark(player);
     }
 
     private void applyPassives() {
