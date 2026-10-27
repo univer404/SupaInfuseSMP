@@ -9,6 +9,7 @@ import com.catadmirer.infuseSMP.util.trust.TrustManager;
 import com.catadmirer.infuseSMP.gui.CraftingGui;
 import com.catadmirer.infuseSMP.gui.InfuseGui;
 import com.catadmirer.infuseSMP.gui.RecipeBookGui;
+import com.catadmirer.infuseSMP.util.regions.RegionManager;
 import com.catadmirer.infuseSMP.util.regions.WorldGuardRegionManager;
 import com.catadmirer.infuseSMP.expansions.InfusePlaceholders;
 import com.catadmirer.infuseSMP.commands.InfuseCommandHandler;
@@ -89,7 +90,7 @@ public final class Infuse extends JavaPlugin {
     private SparkAbilityManager sparkAbilityManager;
     private InfuseGui gui;
     private RecipeBookGui recipeGui;
-    private WorldGuardRegionManager regionManager;
+    private RegionManager regionManager;
     private BukkitTask passiveTask;
 
     @Override public void onEnable() {
