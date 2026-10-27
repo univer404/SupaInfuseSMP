@@ -589,7 +589,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void spark(Player p) {
-        spark(p, null);
+        spark(p, "primary");
     }
     private void spark(Player p, String requestedSlot) {
         String[] s=slots(p.getUniqueId());
