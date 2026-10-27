@@ -808,7 +808,14 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             String[] activeSlots = slots(player.getUniqueId());
             if (disabled(player)) {
                 var attribute = player.getAttribute(Attribute.MAX_HEALTH);
-                if (attribute != null && attribute.getBaseValue() == 30.0) attribute.setBaseValue(20.0);
+                if (attribute != null && (attribute.getBaseValue() == 30.0 || attribute.getBaseValue() == 40.0)) {
+                    attribute.setBaseValue(20.0);
+                    if (player.getHealth() > 20.0) player.setHealth(20.0);
+                }
+                if (invisiblePlayers.remove(player.getUniqueId())) {
+                    player.setCollidable(true);
+                    for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
+                }
                 continue;
             }
             Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
