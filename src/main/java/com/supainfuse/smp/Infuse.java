@@ -1941,9 +1941,10 @@ public final class Infuse extends JavaPlugin implements Listener {
                 for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
             }
             if (displayEnabled.getOrDefault(player.getUniqueId(), true)) {
-                String primaryText = displaySlot(player.getUniqueId(), 0);
-                String secondaryText = displaySlot(player.getUniqueId(), 1);
-                player.sendActionBar(mini.deserialize("<gray>✦ <white>" + primaryText + " <dark_gray>│ <white>" + secondaryText));
+                // These private-use glyphs are supplied by the Infuse resource pack.
+                // Keep the HUD icon-only; do not render effect names or status text.
+                player.sendActionBar(mini.deserialize("\uE30E   \uE088")
+                        .decoration(TextDecoration.ITALIC, false));
             }
             if (active.contains("ender")) {
                 for (Player other : player.getWorld().getPlayers()) {
