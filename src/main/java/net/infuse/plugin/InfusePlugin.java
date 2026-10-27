@@ -44,6 +44,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Set<UUID> invisiblePlayers = new HashSet<>();
     private final Map<UUID, Integer> oceanAir = new HashMap<>();
     private final Map<UUID, Long> oceanLastActive = new HashMap<>();
+    private final Set<UUID> fireGlidingPlayers = new HashSet<>();
     private NamespacedKey effectKey;
     private InfuseGui gui;
     private InfuseRecipeBookGui recipeGui;
@@ -1138,7 +1139,18 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             }
             if (active.contains("strength")) player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 40, 0, true, false, true));
             if (active.contains("regeneration")) player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 0, true, false, true));
-            if (active.contains("fire")) player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 40, 0, true, false, true));
+            if (active.contains("fire")) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 40, 0, true, false, true));
+                if (player.getLocation().getBlock().getType() == Material.LAVA && player.isSneaking()) {
+                    fireGlidingPlayers.add(player.getUniqueId());
+                    player.setGliding(true);
+                    org.bukkit.util.Vector swim = player.getLocation().getDirection().multiply(getConfig().getDouble("effects.fire.swim-power", 0.5));
+                    player.setVelocity(swim.setY(player.getVelocity().getY()));
+                } else if (fireGlidingPlayers.remove(player.getUniqueId())) {
+                    ItemStack chest = player.getInventory().getChestplate();
+                    if (chest == null || chest.getType() != Material.ELYTRA) player.setGliding(false);
+                }
+            }
             if (active.contains("emerald")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, 40, 2, true, false, true));
                 applyToolEnchant(player.getInventory().getItemInMainHand(), enchantment("looting"), 5);
