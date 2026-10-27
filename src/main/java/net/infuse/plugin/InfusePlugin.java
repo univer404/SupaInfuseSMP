@@ -971,6 +971,41 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }, 0L, 20L);
     }
 
+    private void rollFirstJoin(Player player, String selectedEffect) {
+        if (!player.isOnline()) return;
+        if (!getConfig().getBoolean("settings.do-roll-animation", true)) {
+            player.sendTitle(title(selectedEffect) + " Effect", "Your first Infuse", 10, 40, 10);
+            setFreePrimaryEffect(player, selectedEffect);
+            return;
+        }
+        player.playSound(player.getLocation(), "block.respawn_anchor.charge", 0.7f, 0.5f);
+        player.playSound(player.getLocation(), "block.beacon.activate", 0.7f, 2.0f);
+        List<String> choices = EFFECTS.stream().filter(effect -> !effect.equals("earth") && !effect.equals("ender")).toList();
+        final int[] ticks = {0};
+        Bukkit.getScheduler().runTaskTimer(this, task -> {
+            if (!player.isOnline()) { task.cancel(); return; }
+            int index = (ticks[0] / 2) % choices.size();
+            player.sendTitle(title(choices.get(index)) + " Effect", "Rolling your first Infuse...", 0, 2, 0);
+            if (ticks[0] % 10 == 0) player.playSound(player.getLocation(), "block.respawn_anchor.charge", 0.3f, 0.8f + (ticks[0] / 100.0f));
+            ticks[0] += 2;
+            if (ticks[0] >= 100) {
+                task.cancel();
+                setFreePrimaryEffect(player, selectedEffect);
+                player.sendTitle(title(selectedEffect) + " Effect", "Your first Infuse", 10, 40, 10);
+                player.playSound(player.getLocation(), "entity.player.levelup", 0.8f, 1.2f);
+            }
+        }, 0L, 2L);
+    }
+
+    private void setFreePrimaryEffect(Player player, String effect) {
+        String[] current = slots(player.getUniqueId());
+        boolean[] isAugmented = augmented.computeIfAbsent(player.getUniqueId(), ignored -> new boolean[]{false, false});
+        current[0] = effect;
+        isAugmented[0] = false;
+        addHistory(player.getUniqueId(), 0, effect, false);
+        saveData();
+    }
+
     private String displaySlot(UUID playerId, int index) {
         String[] current = slots(playerId);
         String effect = current[index];
@@ -1296,6 +1331,17 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     @EventHandler public void join(PlayerJoinEvent e) {
         Player joining = e.getPlayer();
         slots(joining.getUniqueId());
+        long joinedAt = System.currentTimeMillis();
+        for (String effect : EFFECTS) {
+            cooldowns.put(joining.getUniqueId() + ":" + effect, joinedAt + Math.max(0, getConfig().getLong("effects." + effect + ".cooldown-seconds", 60)) * 1000L);
+        }
+        if (!joining.hasPlayedBefore() && getConfig().getBoolean("settings.roll-first-join", false)) {
+            List<String> rollEffects = EFFECTS.stream().filter(effect -> !effect.equals("earth") && !effect.equals("ender")).toList();
+            if (!rollEffects.isEmpty()) {
+                String selected = rollEffects.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(rollEffects.size()));
+                Bukkit.getScheduler().runTaskLater(this, () -> rollFirstJoin(joining, selected), 40L);
+            }
+        }
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (online.equals(joining)) continue;
             if (invisiblePlayers.contains(online.getUniqueId()) && !trusted.getOrDefault(online.getUniqueId(), Set.of()).contains(joining.getUniqueId())) joining.hidePlayer(this, online);
