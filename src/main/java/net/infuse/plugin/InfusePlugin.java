@@ -48,6 +48,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private NamespacedKey effectKey;
     private InfuseGui gui;
     private InfuseRecipeBookGui recipeGui;
+    private InfuseRegionManager regionManager;
     private BukkitTask passiveTask;
 
     @Override public void onEnable() {
@@ -57,6 +58,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         effectKey = new NamespacedKey(this, "effect");
         gui = new InfuseGui(this);
         recipeGui = new InfuseRecipeBookGui(this);
+        if (Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) regionManager = new InfuseRegionManager(this);
         loadData();
         Objects.requireNonNull(getCommand("infuse")).setExecutor(this);
         Objects.requireNonNull(getCommand("infuse")).setTabCompleter(this);
@@ -128,9 +130,13 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private void tell(CommandSender sender, String key) { sender.sendMessage(mini.deserialize(message(key))); }
     private String clean(String s) { return s == null ? "" : s.toLowerCase(Locale.ROOT); }
     String[] slots(UUID id) { return equipped.computeIfAbsent(id, ignored -> new String[]{"", ""}); }
-    private boolean disabled(Player p) { return getConfig().getStringList("settings.disabled-worlds").contains(p.getWorld().getName()); }
+    private boolean disabled(Player p) {
+        if (getConfig().getStringList("settings.disabled-worlds").contains(p.getWorld().getName())) return true;
+        return regionManager != null && regionManager.isDisabled(p.getLocation());
+    }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("mapregion")) return mapRegionCommand(sender, args);
         if (command.getName().equalsIgnoreCase("conf")) return configCommand(sender, args);
         if (command.getName().equalsIgnoreCase("toggledisplay")) return toggleDisplay(sender);
         if (command.getName().equalsIgnoreCase("resetcooldown")) return resetCooldownCommand(sender, args);
@@ -285,6 +291,48 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         getConfig().set("crafting.crafted." + effect, 0);
         saveConfig();
         sender.sendMessage(mini.deserialize("<green>Reset <white>" + title(effect) + "<green> craft counter. Previous value: <white>" + old));
+        return true;
+    }
+
+    private boolean mapRegionCommand(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
+        if (!(sender instanceof Player player)) { tell(sender, "player-only"); return true; }
+        if (!Bukkit.getPluginManager().isPluginEnabled("WorldGuard") || regionManager == null) {
+            player.sendMessage(mini.deserialize("<red>/mapregion requires WorldGuard to be installed."));
+            return true;
+        }
+        if (args.length == 0) { player.sendMessage("/mapregion <add|delete|list|clear> [region-id]"); return true; }
+        switch (args[0].toLowerCase(Locale.ROOT)) {
+            case "add" -> {
+                if (args.length < 2) { player.sendMessage("/mapregion add <region-id>"); return true; }
+                if (!regionManager.add(player.getWorld().getName(), args[1])) {
+                    player.sendMessage(mini.deserialize("<red>WorldGuard region not found: " + args[1]));
+                    return true;
+                }
+                player.sendMessage(mini.deserialize("<green>Infuse disabled in <white>" + args[1] + "<green> (" + regionManager.bounds(player.getWorld().getName(), args[1]) + ")."));
+            }
+            case "delete" -> {
+                if (args.length < 2) { player.sendMessage("/mapregion delete <region-id>"); return true; }
+                if (regionManager.remove(player.getWorld().getName(), args[1])) player.sendMessage(mini.deserialize("<green>Removed disabled region <white>" + args[1] + "<green>."));
+                else player.sendMessage(mini.deserialize("<red>That region is not mapped for Infuse."));
+            }
+            case "list" -> {
+                List<String> mapped = regionManager.list();
+                if (mapped.isEmpty()) player.sendMessage(mini.deserialize("<gray>No Infuse-disabled regions are mapped."));
+                else {
+                    player.sendMessage(mini.deserialize("<yellow>Infuse-disabled regions:"));
+                    for (String entry : mapped) {
+                        String[] parts = entry.split("\\|", 2);
+                        if (parts.length == 2) player.sendMessage(mini.deserialize("<gray>• <white>" + parts[1] + " <dark_gray>(" + parts[0] + ") <gray>" + regionManager.bounds(parts[0], parts[1])));
+                    }
+                }
+            }
+            case "clear" -> {
+                regionManager.clear();
+                player.sendMessage(mini.deserialize("<green>Cleared all Infuse-disabled regions."));
+            }
+            default -> player.sendMessage("/mapregion <add|delete|list|clear> [region-id]");
+        }
         return true;
     }
 
@@ -1462,6 +1510,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (command.getName().equalsIgnoreCase("resetcooldown")) return args.length == 1 ? List.of("primary", "secondary") : List.of();
         if (command.getName().equalsIgnoreCase("resetcraft")) return args.length == 1 ? java.util.stream.Stream.concat(EFFECTS.stream(), java.util.stream.Stream.of("all")).toList() : List.of();
+        if (command.getName().equalsIgnoreCase("mapregion")) return args.length == 1 ? List.of("add", "delete", "list", "clear") : args.length == 2 && (args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("delete")) && sender instanceof Player player && regionManager != null ? regionManager.list().stream().map(value -> value.substring(value.indexOf('|') + 1)).toList() : List.of();
         if (command.getName().equalsIgnoreCase("conf")) return args.length == 1 ? List.of("get", "set", "list") : args.length == 2 && args[0].equalsIgnoreCase("list") ? List.of("show", "add", "remove", "clear") : List.of();
         if (command.getName().equalsIgnoreCase("item")) return args.length == 1 ? EFFECTS.stream().filter(value -> value.startsWith(args[0].toLowerCase(Locale.ROOT))).toList() : List.of("true", "false");
         if (command.getName().equalsIgnoreCase("trust")) return args.length == 1 ? List.of("add", "remove", "list", "clear") : args.length == 2 ? Bukkit.getOnlinePlayers().stream().map(Player::getName).toList() : List.of();
