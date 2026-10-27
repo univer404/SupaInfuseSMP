@@ -5,7 +5,6 @@ import com.catadmirer.infuseSMP.Infuse;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.WorldGuard;
-import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -63,7 +62,7 @@ public final class WorldGuardRegionManager implements RegionManager {
     }
 
     private ProtectedRegion getRegion(World world, String id) {
-        RegionManager manager = WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(world));
+        com.sk89q.worldguard.protection.managers.RegionManager manager = WorldGuard.getInstance().getPlatform().getRegionContainer().get(BukkitAdapter.adapt(world));
         return manager == null ? null : manager.getRegion(id);
     }
 
