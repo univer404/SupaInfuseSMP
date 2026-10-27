@@ -77,6 +77,7 @@ public final class Infuse extends JavaPlugin {
     private final Map<UUID, Long> oceanLastActive = new HashMap<>();
     private final Set<UUID> fireGlidingPlayers = new HashSet<>();
     private final Map<UUID, Integer> windCharges = new HashMap<>();
+    private final Map<UUID, List<WindChargeVisual>> windChargeVisuals = new HashMap<>();
     private final Map<UUID, Long> windChargeCooldowns = new HashMap<>();
     private final Set<UUID> lightningChainAttackers = new HashSet<>();
     private final Map<UUID, Long> enderCurses = new HashMap<>();
@@ -1311,6 +1312,100 @@ public final class Infuse extends JavaPlugin {
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
     }
 
+    private void addWindCharge(Player player) {
+        UUID id = player.getUniqueId();
+        int maximum = Math.max(0, getConfig().getInt("effects.feather.max-wind-charge", 3));
+        List<WindChargeVisual> visuals = windChargeVisuals.computeIfAbsent(id, ignored -> new ArrayList<>());
+        if (visuals.size() >= maximum) return;
+
+        ItemStack innerItem = windChargeDisplayItem(414900);
+        ItemStack outerItem = windChargeDisplayItem(414901);
+        org.bukkit.entity.ItemDisplay inner = player.getWorld().spawn(player.getEyeLocation(), org.bukkit.entity.ItemDisplay.class);
+        org.bukkit.entity.ItemDisplay outer = player.getWorld().spawn(player.getEyeLocation(), org.bukkit.entity.ItemDisplay.class);
+        inner.setItemStack(innerItem);
+        outer.setItemStack(outerItem);
+        inner.setTeleportDuration(1);
+        outer.setTeleportDuration(1);
+        inner.setPersistent(false);
+        outer.setPersistent(false);
+        inner.setInvulnerable(true);
+        outer.setInvulnerable(true);
+
+        WindChargeVisual visual = new WindChargeVisual(inner, outer);
+        visuals.add(visual);
+        windCharges.put(id, visuals.size());
+        int index = visuals.size() - 1;
+        final long[] age = {0L};
+        visual.task = Bukkit.getScheduler().runTaskTimer(this, () -> {
+            if (!player.isOnline() || !inner.isValid() || !outer.isValid() ||
+                    !Arrays.asList(slots(id)).contains("feather")) {
+                disposeWindChargeVisual(id, visual);
+                return;
+            }
+            double angle = age[0] * 0.12 + index * (Math.PI * 2.0 / Math.max(1, maximum));
+            org.bukkit.Location eye = player.getEyeLocation();
+            inner.teleport(eye.clone().add(Math.cos(angle) * 0.35, Math.sin(angle * 0.5) * 0.12, Math.sin(angle) * 0.35));
+            outer.teleport(eye.clone().add(Math.cos(-angle) * 0.55, Math.sin(angle * 0.5 + 1.2) * 0.18, Math.sin(-angle) * 0.55));
+            age[0]++;
+        }, 0L, 1L);
+    }
+
+    private ItemStack windChargeDisplayItem(int customModelData) {
+        ItemStack item = new ItemStack(Material.WIND_CHARGE);
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setCustomModelData(customModelData);
+            meta.displayName(net.kyori.adventure.text.Component.empty());
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private void removeWindChargeVisual(Player player) {
+        UUID id = player.getUniqueId();
+        List<WindChargeVisual> visuals = windChargeVisuals.get(id);
+        if (visuals != null && !visuals.isEmpty()) {
+            disposeWindChargeVisual(id, visuals.get(0));
+        } else {
+            windCharges.put(id, Math.max(0, windCharges.getOrDefault(id, 0) - 1));
+        }
+    }
+
+    private void disposeWindChargeVisual(UUID ownerId, WindChargeVisual visual) {
+        if (visual.task != null) visual.task.cancel();
+        if (visual.inner.isValid()) visual.inner.remove();
+        if (visual.outer.isValid()) visual.outer.remove();
+        List<WindChargeVisual> visuals = windChargeVisuals.get(ownerId);
+        if (visuals != null) {
+            visuals.remove(visual);
+            if (visuals.isEmpty()) windChargeVisuals.remove(ownerId);
+            windCharges.put(ownerId, visuals.size());
+        }
+    }
+
+    private void clearWindChargeVisuals(UUID ownerId) {
+        List<WindChargeVisual> visuals = windChargeVisuals.remove(ownerId);
+        if (visuals != null) {
+            for (WindChargeVisual visual : new ArrayList<>(visuals)) {
+                if (visual.task != null) visual.task.cancel();
+                if (visual.inner.isValid()) visual.inner.remove();
+                if (visual.outer.isValid()) visual.outer.remove();
+            }
+        }
+        windCharges.remove(ownerId);
+    }
+
+    private static final class WindChargeVisual {
+        private final org.bukkit.entity.ItemDisplay inner;
+        private final org.bukkit.entity.ItemDisplay outer;
+        private BukkitTask task;
+
+        private WindChargeVisual(org.bukkit.entity.ItemDisplay inner, org.bukkit.entity.ItemDisplay outer) {
+            this.inner = inner;
+            this.outer = outer;
+        }
+    }
+
     private void activateSpeedDash(Player player, int durationTicks) {
         org.bukkit.util.Vector direction = player.getLocation().getDirection().setY(0).normalize();
         if (direction.lengthSquared() < 0.001) direction = new org.bukkit.util.Vector(0, 0, 1);
@@ -1913,7 +2008,7 @@ public final class Infuse extends JavaPlugin {
         isAugmented[0] = false; isAugmented[1] = false;
         saveData();
         invisiblePlayers.remove(id);
-        windCharges.remove(id);
+        clearWindChargeVisuals(id);
         windChargeCooldowns.remove(id);
         stopInvisibilitySpark(victim);
         enderCurses.remove(id);
@@ -2113,7 +2208,7 @@ public final class Infuse extends JavaPlugin {
             int triggerHits = Math.max(1, getConfig().getInt("effects.feather.trigger-hits", 3));
             int maxCharges = Math.max(0, getConfig().getInt("effects.feather.max-wind-charge", 2));
             if (pairHits > 0 && pairHits % triggerHits == 0 && windCharges.getOrDefault(victim.getUniqueId(), 0) < maxCharges) {
-                windCharges.merge(victim.getUniqueId(), 1, Integer::sum);
+                addWindCharge(victim);
                 victim.playSound(victim.getLocation(), "entity.wind_charge.wind_burst", 0.6f, 1.4f);
             }
         }
@@ -2210,7 +2305,7 @@ public final class Infuse extends JavaPlugin {
         int charges = windCharges.getOrDefault(playerId, 0);
         long cooldownUntil = windChargeCooldowns.getOrDefault(playerId, 0L);
         if (charges > 0 && !disabled(player) && cooldownUntil <= System.currentTimeMillis()) {
-            windCharges.put(playerId, charges - 1);
+            removeWindChargeVisual(player);
             org.bukkit.entity.WindCharge charge = player.getWorld().spawn(player.getEyeLocation(), org.bukkit.entity.WindCharge.class);
             charge.setShooter(player);
             charge.setVelocity(player.getLocation().getDirection().multiply(
@@ -2246,7 +2341,7 @@ public final class Infuse extends JavaPlugin {
         oceanAir.remove(player.getUniqueId());
         oceanLastActive.remove(player.getUniqueId());
         recentDamage.remove(player.getUniqueId());
-        windCharges.remove(player.getUniqueId());
+        clearWindChargeVisuals(player.getUniqueId());
         windChargeCooldowns.remove(player.getUniqueId());
         enderCurses.remove(player.getUniqueId());
         regenFoodWindow.remove(player.getUniqueId());
