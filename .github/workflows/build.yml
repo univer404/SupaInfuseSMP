@@ -16,113 +16,100 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Validate configured resource pack
+      - name: Prepare Minecraft 26.3 texture pack
+        id: pack
         run: |
           python - <<'PY'
-          import hashlib, io, json, re, urllib.request, zipfile
-          with open("src/main/resources/config.yml", encoding="utf-8") as f:
-              config_text = f.read()
-          match = re.search(r"(?ms)^  resource-pack:\s*\n(?P<section>(?:^    .*\n|^\s*\n)*)", config_text)
-          if not match:
-              raise SystemExit("Missing settings.resource-pack section in config.yml.")
-          section = match.group("section")
-          enabled = re.search(r"(?m)^    enabled:\s*(true|false)\s*$", section)
-          if not enabled or enabled.group(1).lower() != "true":
-              print("Resource pack delivery is disabled; skipping validation.")
-              raise SystemExit(0)
-          url_match = re.search(r'(?m)^    url:\s*"([^"]+)"', section)
-          sha_match = re.search(r'(?m)^    sha1:\s*"([0-9a-fA-F]{40})"', section)
-          if not url_match or not sha_match:
-              raise SystemExit("Resource pack URL or 40-character SHA-1 is missing.")
-          url = url_match.group(1).strip()
-          expected = sha_match.group(1).lower()
-          if not url.startswith("https://") or len(expected) != 40:
-              raise SystemExit("Resource pack must have an HTTPS URL and a 40-character SHA-1.")
-          request = urllib.request.Request(url, headers={"User-Agent": "SupaInfuseSMP-resource-pack-check"})
-          with urllib.request.urlopen(request, timeout=30) as response:
-              data = response.read()
-          actual = hashlib.sha1(data).hexdigest()
-          if actual != expected:
-              raise SystemExit(f"Resource-pack SHA-1 mismatch: expected {expected}, got {actual}")
-          with zipfile.ZipFile(io.BytesIO(data)) as archive:
-              bad = archive.testzip()
-              if bad:
-                  raise SystemExit(f"Corrupt resource-pack entry: {bad}")
-              if "pack.mcmeta" not in archive.namelist():
-                  raise SystemExit("Resource pack ZIP is missing root pack.mcmeta.")
-              metadata = json.loads(archive.read("pack.mcmeta"))
-              pack_meta = metadata.get("pack", {})
-              if not any(k in pack_meta for k in ("min_format", "max_format", "pack_format")):
-                  raise SystemExit("pack.mcmeta has no recognized format metadata.")
-              print(f"Resource pack OK: {len(data)} bytes, SHA-1 {actual}")
-              print(f"pack.mcmeta: {json.dumps(pack_meta, ensure_ascii=False)}")
-              print(f"Entries: {len(archive.namelist())}")
-          PY
-      - name: Prepare Minecraft 1.21.11 texture pack
-        run: |
-          python - <<'PY'
-          import hashlib, io, json, urllib.request, zipfile
-          source_url = "https://raw.githubusercontent.com/o-hex/InfuseS3/main/_texturepack.zip"
+          import hashlib, io, json, os, urllib.request, zipfile
+          source_url = "https://github.com/univer404/SupaInfuseSMP/releases/download/tpack-1.21.11/Infuse-Texture-Pack-1.21.11.zip"
           request = urllib.request.Request(source_url, headers={"User-Agent": "SupaInfuseSMP-pack-builder"})
-          with urllib.request.urlopen(request, timeout=30) as response:
+          with urllib.request.urlopen(request, timeout=60) as response:
               original = response.read()
           original_sha1 = hashlib.sha1(original).hexdigest()
-          expected_original_sha1 = "2a4079e2f08424192e4ee8b8d3df26d1f386cd15"
-          if original_sha1 != expected_original_sha1:
-              raise SystemExit(f"Upstream pack changed: expected {expected_original_sha1}, got {original_sha1}")
-          source = zipfile.ZipFile(io.BytesIO(original))
-          if "pack.mcmeta" not in source.namelist():
-              raise SystemExit("Original texture pack is missing root pack.mcmeta.")
-          metadata = json.loads(source.read("pack.mcmeta"))
-          pack = metadata.setdefault("pack", {})
-          old_format = pack.get("pack_format", "modern metadata")
-          pack["pack_format"] = 75
-          pack["description"] = "InfuseSMP resource pack - updated metadata for Minecraft 1.21.11"
-          output = io.BytesIO()
-          with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
-              for info in source.infolist():
-                  data = source.read(info.filename)
-                  if info.filename == "pack.mcmeta":
-                      data = (json.dumps(metadata, ensure_ascii=False, indent=2)).encode("utf-8")
-                  target.writestr(info, data)
+          expected_source_sha1 = "c84941d094d95ca1c5f3429989aa8b26f377ce16"
+          if original_sha1 != expected_source_sha1:
+              raise SystemExit(f"Published source pack checksum mismatch: expected {expected_source_sha1}, got {original_sha1}")
+          with zipfile.ZipFile(io.BytesIO(original)) as source:
+              bad = source.testzip()
+              if bad:
+                  raise SystemExit(f"Source pack has corrupt entry: {bad}")
+              if "pack.mcmeta" not in source.namelist():
+                  raise SystemExit("Source texture pack is missing root pack.mcmeta.")
+              metadata = json.loads(source.read("pack.mcmeta"))
+              pack = metadata.setdefault("pack", {})
+              old_format = {key: pack.get(key) for key in ("pack_format", "min_format", "max_format") if key in pack}
+              # Minecraft Java 26.3 uses resource-pack format 97.1.
+              # Use modern range metadata (required for format 65+) rather than legacy pack_format.
+              pack.pop("pack_format", None)
+              pack.pop("supported_formats", None)
+              pack["min_format"] = [97, 1]
+              pack["max_format"] = [97, 1]
+              pack["description"] = "InfuseSMP resource pack for Minecraft Java 26.3"
+              output = io.BytesIO()
+              with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
+                  for info in source.infolist():
+                      data = source.read(info.filename)
+                      if info.filename == "pack.mcmeta":
+                          data = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
+                      target.writestr(info, data)
           result = output.getvalue()
           with zipfile.ZipFile(io.BytesIO(result)) as check:
               bad = check.testzip()
               if bad:
                   raise SystemExit(f"Generated pack has corrupt entry: {bad}")
-              checked_metadata = json.loads(check.read("pack.mcmeta"))
-              if checked_metadata.get("pack", {}).get("pack_format") != 75:
-                  raise SystemExit("Generated pack metadata does not declare pack_format 75.")
-          import os
+              checked = json.loads(check.read("pack.mcmeta"))["pack"]
+              if checked.get("min_format") != [97, 1] or checked.get("max_format") != [97, 1]:
+                  raise SystemExit("Generated pack metadata does not declare Minecraft 26.3 format 97.1.")
           os.makedirs("target", exist_ok=True)
-          output_path = "target/Infuse-Texture-Pack-1.21.11.zip"
+          output_path = "target/Infuse-Texture-Pack-26.3.zip"
           with open(output_path, "wb") as f:
               f.write(result)
-          print(f"Updated pack metadata from {old_format} to 75.")
-          print(f"Original SHA-1: {original_sha1}")
-          print(f"NEW_PACK_SHA1={hashlib.sha1(result).hexdigest()}")
+          sha1 = hashlib.sha1(result).hexdigest()
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"sha1={sha1}\n")
+          print(f"Updated metadata: {old_format} -> min_format/max_format [97, 1].")
+          print(f"NEW_PACK_SHA1={sha1}")
           print(f"Output: {output_path} ({len(result)} bytes)")
+          print("Note: metadata compatibility is not a substitute for live testing of models, fonts, textures, and sounds.")
+          PY
+      - name: Set packaged resource-pack URL and checksum
+        env:
+          PACK_SHA1: ${{ steps.pack.outputs.sha1 }}
+        run: |
+          python - <<'PY'
+          import os, re
+          path = "src/main/resources/config.yml"
+          with open(path, encoding="utf-8") as file:
+              content = file.read()
+          url = "https://github.com/univer404/SupaInfuseSMP/releases/download/tpack-26.3/Infuse-Texture-Pack-26.3.zip"
+          content, url_count = re.subn(r'(?m)^(    url:)\s*"[^"]+"$', lambda m: f'{m.group(1)} "{url}"', content, count=1)
+          content, sha_count = re.subn(r'(?m)^(    sha1:)\s*"[^"]+"$', lambda m: f'{m.group(1)} "{os.environ["PACK_SHA1"]}"', content, count=1)
+          if url_count != 1 or sha_count != 1 or not re.fullmatch(r"[0-9a-f]{40}", os.environ["PACK_SHA1"]):
+              raise SystemExit("Could not safely update resource-pack URL/checksum in config.yml.")
+          with open(path, "w", encoding="utf-8") as file:
+              file.write(content)
+          print(f"Packaged config points to {url} with SHA-1 {os.environ['PACK_SHA1']}")
           PY
       - name: Upload updated texture pack
         uses: actions/upload-artifact@v4
         with:
-          name: Infuse-Texture-Pack-1.21.11
-          path: target/Infuse-Texture-Pack-1.21.11.zip
+          name: Infuse-Texture-Pack-26.3
+          path: target/Infuse-Texture-Pack-26.3.zip
           if-no-files-found: error
           retention-days: 14
       - name: Publish stable texture pack release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="tpack-1.21.11"
-          asset="target/Infuse-Texture-Pack-1.21.11.zip"
+          tag="tpack-26.3"
+          asset="target/Infuse-Texture-Pack-26.3.zip"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "$asset" --clobber
           else
             gh release create "$tag" "$asset" \
               --target "$GITHUB_SHA" \
-              --title "Infuse Texture Pack for Minecraft 1.21.11" \
-              --notes "Updated pack metadata for Minecraft 1.21.11. Original Infuse assets are preserved; in-game texture, font, model, and sound compatibility still needs client testing."
+              --title "Infuse Texture Pack for Minecraft Java 26.3" \
+              --notes "Pack metadata targets Minecraft Java 26.3 resource-pack format 97.1. Original pack assets are preserved. This metadata update does not itself migrate changed model/font/texture formats; client-side testing is still required."
           fi
       - name: Build plugin
         run: mvn --batch-mode --no-transfer-progress clean package
