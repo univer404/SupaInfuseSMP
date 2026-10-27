@@ -40,6 +40,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<String, Long> sparkEnds = new HashMap<>();
     private final Map<UUID, Long> trustActionCooldowns = new HashMap<>();
     private final Set<UUID> invisiblePlayers = new HashSet<>();
+    private final Map<UUID, Integer> oceanAir = new HashMap<>();
+    private final Map<UUID, Long> oceanLastActive = new HashMap<>();
     private NamespacedKey effectKey;
     private InfuseGui gui;
     private InfuseRecipeBookGui recipeGui;
@@ -909,6 +911,46 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }, 0L, 20L);
     }
 
+    private void applyOceanAura() {
+        long now = System.currentTimeMillis();
+        Set<UUID> affected = new HashSet<>();
+        for (Player caster : Bukkit.getOnlinePlayers()) {
+            if (disabled(caster) || !Arrays.asList(slots(caster.getUniqueId())).contains("ocean")) continue;
+            double radius = getConfig().getDouble("effects.ocean.passive-radius", 4.0);
+            for (Player target : caster.getWorld().getPlayers()) {
+                if (target.equals(caster) || disabled(target) || target.getLocation().distanceSquared(caster.getLocation()) > radius * radius) continue;
+                if (trusted.getOrDefault(caster.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                if (target.getEyeLocation().getBlock().isLiquid() == false || target.hasPotionEffect(PotionEffectType.WATER_BREATHING)) continue;
+                UUID targetId = target.getUniqueId();
+                int respiration = 0;
+                ItemStack helmet = target.getInventory().getHelmet();
+                if (helmet != null) respiration = helmet.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.OXYGEN);
+                int maxAir = 15 + respiration * 15;
+                int remaining = oceanAir.getOrDefault(targetId, maxAir) - 1;
+                if (remaining <= 0) {
+                    remaining = 0;
+                    target.damage(getConfig().getDouble("effects.ocean.drown-damage", 1.0), caster);
+                }
+                oceanAir.put(targetId, remaining);
+                oceanLastActive.put(targetId, now);
+                affected.add(targetId);
+            }
+        }
+        for (UUID targetId : new HashSet<>(oceanAir.keySet())) {
+            if (affected.contains(targetId)) continue;
+            Player target = Bukkit.getPlayer(targetId);
+            if (target == null) { oceanAir.remove(targetId); oceanLastActive.remove(targetId); continue; }
+            if (now - oceanLastActive.getOrDefault(targetId, 0L) < 1100L) continue;
+            int respiration = 0;
+            ItemStack helmet = target.getInventory().getHelmet();
+            if (helmet != null) respiration = helmet.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.OXYGEN);
+            int maxAir = 15 + respiration * 15;
+            int remaining = oceanAir.getOrDefault(targetId, 0) + 2;
+            if (remaining >= maxAir) { oceanAir.remove(targetId); oceanLastActive.remove(targetId); }
+            else oceanAir.put(targetId, remaining);
+        }
+    }
+
     private void applyToolEnchant(ItemStack item, org.bukkit.enchantments.Enchantment enchantment, int level) {
         if (item == null || item.getType() == Material.AIR) return;
         boolean overwrite = getConfig().getBoolean("settings.overwrite-enchants", true);
@@ -1024,6 +1066,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 }
             }
         }
+        applyOceanAura();
     }
 
     @EventHandler
