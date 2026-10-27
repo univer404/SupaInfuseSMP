@@ -400,6 +400,10 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private boolean equipEffect(Player player, String effect, boolean isAugmented, boolean consumeItem) {
+        return equipEffect(player, effect, isAugmented, consumeItem, null);
+    }
+
+    private boolean equipEffect(Player player, String effect, boolean isAugmented, boolean consumeItem, Integer forcedSlot) {
         if (disabled(player)) {
             player.sendMessage(mini.deserialize("<red>Infuse effects are disabled in this world."));
             return false;
@@ -408,7 +412,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             player.sendMessage(mini.deserialize("<red>You need to have that effect item in your inventory."));
             return false;
         }
-        int target = player.isSneaking() ? 1 : 0;
+        int target = forcedSlot == null ? (player.isSneaking() ? 1 : 0) : Math.max(0, Math.min(1, forcedSlot));
         if (getConfig().getBoolean("settings.lock-effects", false)) {
             if (getConfig().getStringList("settings.primary-effects").contains(effect)) target = 0;
             else if (getConfig().getStringList("settings.secondary-effects").contains(effect)) target = 1;
@@ -489,7 +493,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             String encoded=clicked.getItemMeta().getPersistentDataContainer().get(effectKey,PersistentDataType.STRING);
             if(encoded==null) return;
             String effect=encoded.split(":")[0];
-            equipEffect(p, effect, encoded.endsWith(":augmented"), true);
+            equipEffect(p, effect, encoded.endsWith(":augmented"), true, selectionMode.getOrDefault(p.getUniqueId(), 0));
             openMain(p);
         }
     }
