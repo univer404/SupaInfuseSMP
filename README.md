@@ -32,7 +32,8 @@ src/main/java/com/catadmirer/infuseSMP/
 ├── commands/
 │   └── InfuseCommandHandler.java
 ├── effects/
-│   └── EffectRegistry.java      # playable effect keys and icon ordering
+│   ├── EffectRegistry.java      # playable effect keys and icon ordering
+│   └── SparkAbilityManager.java # Spark activation dispatch
 ├── expansions/
 │   └── InfusePlaceholders.java  # optional PlaceholderAPI expansion
 ├── gui/
