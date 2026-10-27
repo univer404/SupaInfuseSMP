@@ -1193,17 +1193,7 @@ public final class Infuse extends JavaPlugin {
         }, durationTicks);
         p.playSound(p.getLocation(), getConfig().getString("settings.use-sound", "custom.activate"), 1.0f, 1.0f);
         switch (effect) {
-            case "speed" -> {
-                org.bukkit.util.Vector direction = p.getLocation().getDirection().setY(0).normalize().multiply(getConfig().getDouble("effects.speed.dash-power", 2.6));
-                p.setVelocity(direction.setY(Math.max(0.15, p.getVelocity().getY())));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationTicks, 1, true, false, true));
-                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(1.5, 1.5, 1.5)) {
-                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
-                    if (entity instanceof Player target && trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
-                    living.damage(getConfig().getDouble("effects.speed.dash-true-damage", 2.0), p);
-                    p.getWorld().spawnParticle(org.bukkit.Particle.SWEEP_ATTACK, living.getLocation().add(0, 1, 0), 4, 0.3, 0.3, 0.3, 0);
-                }
-            }
+            case "speed" -> activateSpeedDash(p, durationTicks);
             case "feather" -> {
                 p.setVelocity(p.getVelocity().setY(0));
                 p.setVelocity(p.getVelocity().setY(getConfig().getDouble("effects.feather.initial-bounce-power", 1.2)));
@@ -1305,6 +1295,42 @@ public final class Infuse extends JavaPlugin {
             case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
         }
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
+    }
+
+    private void activateSpeedDash(Player player, int durationTicks) {
+        org.bukkit.util.Vector direction = player.getLocation().getDirection().setY(0).normalize();
+        if (direction.lengthSquared() < 0.001) direction = new org.bukkit.util.Vector(0, 0, 1);
+        final org.bukkit.util.Vector dashDirection = direction.clone();
+        int iterations = Math.max(1, getConfig().getInt("effects.speed.dash-iteration", 14));
+        double initialPower = getConfig().getDouble("effects.speed.dash-power", 2.6);
+        double damping = Math.max(0.0, Math.min(1.0, getConfig().getDouble("effects.speed.dash-damping", 0.6)));
+        double radius = Math.max(0.1, getConfig().getDouble("effects.speed.dash-effect-radius", 1.5));
+        double damage = Math.max(0.0, getConfig().getDouble("effects.speed.dash-true-damage", 2.0));
+        Set<UUID> alreadyHit = new HashSet<>();
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationTicks, 1, true, false, true));
+        new org.bukkit.scheduler.BukkitRunnable() {
+            private int tick;
+
+            @Override
+            public void run() {
+                if (!player.isOnline() || disabled(player) || tick >= iterations) {
+                    cancel();
+                    return;
+                }
+                double power = initialPower * Math.pow(damping, tick);
+                player.setVelocity(dashDirection.clone().multiply(power).setY(Math.max(0.1, player.getVelocity().getY())));
+                for (org.bukkit.entity.Entity entity : player.getNearbyEntities(radius, radius, radius)) {
+                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(player) || living.isDead()) continue;
+                    if (living instanceof Player target && trustManager.isTrusted(player.getUniqueId(), target.getUniqueId())) continue;
+                    if (!alreadyHit.add(living.getUniqueId())) continue;
+                    if (getConfig().getBoolean("settings.allow-true-damage", true) && damage > 0) living.damage(damage, player);
+                    player.getWorld().spawnParticle(org.bukkit.Particle.SWEEP_ATTACK,
+                            living.getLocation().add(0, 1, 0), 4, 0.3, 0.3, 0.3, 0);
+                }
+                player.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, player.getLocation(), 6, 0.25, 0.2, 0.25, 0.02);
+                tick++;
+            }
+        }.runTaskTimer(this, 0L, Math.max(1, getConfig().getInt("effects.speed.dash-interval-ticks", 1)));
     }
 
     private void activateOceanSpark(Player caster) {
