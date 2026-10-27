@@ -124,6 +124,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("item")) return itemCommand(sender, args);
+        if (command.getName().equalsIgnoreCase("ldrain") || command.getName().equalsIgnoreCase("pdrain")) return drainEffect(sender, "primary");
+        if (command.getName().equalsIgnoreCase("rdrain") || command.getName().equalsIgnoreCase("sdrain")) return drainEffect(sender, "secondary");
         if (command.getName().equalsIgnoreCase("trust")) return trustCommand(sender, args);
         if (command.getName().equalsIgnoreCase("control")) return controlCommand(sender, args);
         if (command.getName().equalsIgnoreCase("use")) {
@@ -182,6 +184,35 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             spark(p); return true;
         }
         sender.sendMessage("Usage: /infuse [gui|give|clear|spark|reload]");
+        return true;
+    }
+
+    private boolean drainEffect(CommandSender sender, String slot) {
+        if (!(sender instanceof Player player)) { tell(sender, "player-only"); return true; }
+        int index = slot.equals("primary") ? 0 : 1;
+        String[] current = slots(player.getUniqueId());
+        boolean[] isAugmented = augmented.computeIfAbsent(player.getUniqueId(), ignored -> new boolean[]{false, false});
+        String effect = current[index];
+        if (effect == null || effect.isBlank()) {
+            player.sendMessage(mini.deserialize("<red>You don't have an effect in your " + slot + " slot."));
+            return true;
+        }
+        if (cooldowns.getOrDefault(player.getUniqueId() + ":" + effect, 0L) > System.currentTimeMillis()) {
+            player.sendMessage(mini.deserialize("<red>You cannot remove this effect while it is active or on cooldown."));
+            return true;
+        }
+        ItemStack item = createEffectItem(effect, isAugmented[index]);
+        if (player.getInventory().firstEmpty() == -1) {
+            player.sendMessage(mini.deserialize("<red>Your inventory is full."));
+            return true;
+        }
+        player.getInventory().addItem(item);
+        current[index] = "";
+        isAugmented[index] = false;
+        addHistory(player.getUniqueId(), index, "none", false);
+        saveData();
+        player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOTTLE_FILL, 0.5f, 0.8f);
+        player.sendMessage(mini.deserialize("<yellow>Drained <white>" + title(effect) + "<yellow> from your " + slot + " slot."));
         return true;
     }
 
