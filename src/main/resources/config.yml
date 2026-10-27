@@ -9,6 +9,7 @@ settings:
   secondary-effects: [speed, fire, ocean, emerald]
   trust-list-max: 3
   trust-list-delay-seconds: 10
+  recent-damage-window-seconds: 30
   do-roll-animation: true
   roll-first-join: false
   head-drop: false
