@@ -880,6 +880,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         Player joining = e.getPlayer();
         slots(joining.getUniqueId());
         for (Player online : Bukkit.getOnlinePlayers()) {
+            if (online.equals(joining)) continue;
             if (invisiblePlayers.contains(online.getUniqueId()) && !trusted.getOrDefault(online.getUniqueId(), Set.of()).contains(joining.getUniqueId())) joining.hidePlayer(this, online);
             if (invisiblePlayers.contains(joining.getUniqueId()) && !trusted.getOrDefault(joining.getUniqueId(), Set.of()).contains(online.getUniqueId())) online.hidePlayer(this, joining);
         }
