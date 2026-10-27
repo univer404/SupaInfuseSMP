@@ -22,14 +22,14 @@ The JAR is written to `target/Infuse.jar`. GitHub Actions builds the branch and 
 
 ## Texture pack
 
-The original supplied pack is configured at the HTTPS URL in `src/main/resources/config.yml`; its expected SHA-1 is `2a4079e2f08424192e4ee8b8d3df26d1f386cd15`. The pack contains custom effect glyphs, potion/wind-charge item models, textures, and four custom sounds. The build validates the currently configured hosted ZIP, but the binary pack itself is still hosted by the original upstream repository rather than copied into this repository. The pack's original `pack.mcmeta` declares legacy `pack_format: 64`; this may show a compatibility warning on Minecraft 1.21.11 (resource-pack format 75). The metadata warning is distinct from whether the server can download the pack.
+The supplied upstream pack is not authored by SupaInfuseSMP, so its original author attribution is not changed. GitHub Actions creates a separate `Infuse-Texture-Pack-1.21.11` artifact by updating the pack metadata to format 75 and validating the ZIP. Download it from the successful build's **Artifacts** section. This metadata update does not prove every model, font glyph, or sound works in-game; those still require client testing. The plugin currently prompts players using the URL and SHA-1 in `src/main/resources/config.yml`, which must be changed to a stable HTTPS host for the generated pack before automatic delivery can use the updated ZIP.
 
 ## Source layout
 
 The Java source follows the package-oriented layout used by the reference project, with one purpose per package:
 
 ```text
-src/main/java/com/catadmirer/infuseSMP/
+src/main/java/com/supainfuse/smp/
 ├── Infuse.java                  # plugin lifecycle and shared effect state
 ├── commands/
 │   └── InfuseCommandHandler.java
