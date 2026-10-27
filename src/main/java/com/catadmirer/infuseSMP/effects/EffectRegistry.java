@@ -1,4 +1,4 @@
-package com.catadmirer.infuseSMP.effects;
+package com.supainfuse.smp.effects;
 
 import java.util.List;
 import java.util.Locale;
