@@ -91,6 +91,6 @@ Install WorldGuard to use `/mapregion`. Without it, the plugin still supports th
 
 ## Status
 
-The conversion now has dedicated command, listener, GUI, effect-registry, message, trust, region, and placeholder packages. It implements the main effect items, primary/secondary slots, Spark activation/cooldowns, controls, trust delays, death handling, configurable GUIs, recipe browsing/crafting, augmented rituals, region restrictions, and a subset of effect-specific passive/combat abilities.
+The conversion now has dedicated command, listener, GUI, effect-registry, augmentation/enchanting, message, trust, region, and placeholder packages. It implements the main effect items, primary/secondary slots, Spark activation/cooldowns, controls, trust delays, death handling, configurable GUIs, recipe browsing/crafting, augmented rituals, region restrictions, and a subset of effect-specific passive/combat abilities.
 
 It remains an **in-progress conversion** rather than a verified feature-for-feature replacement. Some effect edge cases, original animation sequences, and SkBee-specific behavior still need parity testing. Use a test server first and do not treat it as production-equivalent until the remaining parity checks and live-server tests are complete.
