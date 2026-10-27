@@ -136,6 +136,7 @@ effects:
     trident-pull-coefficient: 0.27
     trident-pull-offset: 1.5
     trident-pull-cap: 16.0
+    trident-pull-cooldown-seconds: 5
     passive-radius: 8.0
     drown-damage: 2.0
     rain-damage-multiplier: 2.0
