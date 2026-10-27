@@ -1,4 +1,4 @@
-package com.catadmirer.infuseSMP.extraeffects;
+package com.supainfuse.smp.extraeffects;
 
 import org.junit.jupiter.api.Test;
 
