@@ -34,6 +34,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<String, Integer> hitCounters = new HashMap<>();
     private NamespacedKey effectKey;
     private InfuseGui gui;
+    private InfuseRecipeBookGui recipeGui;
     private BukkitTask passiveTask;
 
     @Override public void onEnable() {
@@ -42,6 +43,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         saveResource("messages.yml", false);
         effectKey = new NamespacedKey(this, "effect");
         gui = new InfuseGui(this);
+        recipeGui = new InfuseRecipeBookGui(this);
         loadData();
         Objects.requireNonNull(getCommand("infuse")).setExecutor(this);
         Objects.requireNonNull(getCommand("infuse")).setTabCompleter(this);
@@ -49,6 +51,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         Objects.requireNonNull(getCommand("trust")).setTabCompleter(this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new InfuseCraftingGui(this), this);
+        getServer().getPluginManager().registerEvents(recipeGui, this);
         passiveTask = Bukkit.getScheduler().runTaskTimer(this, this::applyPassives, 20L, 20L);
         getLogger().info("Infuse initialized. " + EFFECTS.size() + " effect identifiers registered.");
     }
@@ -113,7 +116,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
         if (command.getName().equalsIgnoreCase("recipes")) {
             if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
-            p.sendMessage(mini.deserialize("<light_purple>Use a sneaking right-click on a brewing stand to open the Infuse crafting menu."));
+            recipeGui.open(p);
             return true;
         }
         if (args.length == 0 || args[0].equalsIgnoreCase("gui")) {
