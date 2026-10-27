@@ -388,6 +388,90 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     String title(String effect) { return effect.substring(0,1).toUpperCase(Locale.ROOT)+effect.substring(1); }
     String display(String effect) { return effect == null || effect.isBlank() ? "None" : title(effect); }
 
+    @EventHandler
+    public void onEffectPotionConsume(org.bukkit.event.player.PlayerItemConsumeEvent event) {
+        ItemStack item = event.getItem();
+        if (item == null || !item.hasItemMeta()) return;
+        String encoded = item.getItemMeta().getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
+        if (encoded == null) return;
+        event.setCancelled(true);
+        String[] parts = encoded.split(":");
+        equipEffect(event.getPlayer(), parts[0], parts.length > 1 && parts[1].equalsIgnoreCase("augmented"), true);
+    }
+
+    private boolean equipEffect(Player player, String effect, boolean isAugmented, boolean consumeItem) {
+        if (disabled(player)) {
+            player.sendMessage(mini.deserialize("<red>Infuse effects are disabled in this world."));
+            return false;
+        }
+        if (consumeItem && !hasEffectItem(player, effect, isAugmented)) {
+            player.sendMessage(mini.deserialize("<red>You need to have that effect item in your inventory."));
+            return false;
+        }
+        int target = player.isSneaking() ? 1 : 0;
+        if (getConfig().getBoolean("settings.lock-effects", false)) {
+            if (getConfig().getStringList("settings.primary-effects").contains(effect)) target = 0;
+            else if (getConfig().getStringList("settings.secondary-effects").contains(effect)) target = 1;
+        }
+        String[] current = slots(player.getUniqueId());
+        boolean[] currentAugmented = augmented.computeIfAbsent(player.getUniqueId(), ignored -> new boolean[]{false, false});
+        if (!getConfig().getBoolean("settings.allow-same-effects", false) && effect.equals(current[1 - target])) {
+            player.sendMessage(mini.deserialize("<red>You already have this effect in your other slot."));
+            return false;
+        }
+        if (effect.equals(current[target])) {
+            player.sendMessage(mini.deserialize("<red>You already have this effect equipped in that slot."));
+            return false;
+        }
+        if (!current[target].isBlank()) {
+            long activeUntil = cooldowns.getOrDefault(player.getUniqueId() + ":" + current[target], 0L);
+            if (activeUntil > System.currentTimeMillis()) {
+                player.sendMessage(mini.deserialize("<red>You cannot replace that effect until its cycle finishes."));
+                return false;
+            }
+        }
+        if (consumeItem && !removeOneEffectItem(player, effect, isAugmented)) return false;
+        if (!current[target].isBlank()) {
+            ItemStack oldItem = createEffectItem(current[target], currentAugmented[target]);
+            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(oldItem);
+            leftovers.values().forEach(left -> player.getWorld().dropItemNaturally(player.getLocation(), left));
+        }
+        current[target] = effect;
+        currentAugmented[target] = isAugmented;
+        saveData();
+        player.sendMessage(mini.deserialize("<green>Applied <white>" + (isAugmented ? "Augmented " : "") + title(effect) + "<green> to your " + (target == 0 ? "primary" : "secondary") + " slot."));
+        player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1.0f, target == 0 ? 1.1f : 1.4f);
+        return true;
+    }
+
+    private boolean hasEffectItem(Player player, String effect, boolean isAugmented) {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || !item.hasItemMeta()) continue;
+            String encoded = item.getItemMeta().getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
+            if (encoded == null) continue;
+            String[] parts = encoded.split(":");
+            if (parts[0].equals(effect) && (parts.length > 1 && parts[1].equalsIgnoreCase("augmented")) == isAugmented) return true;
+        }
+        return false;
+    }
+
+    private boolean removeOneEffectItem(Player player, String effect, boolean isAugmented) {
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            ItemStack item = contents[slot];
+            if (item == null || !item.hasItemMeta()) continue;
+            String encoded = item.getItemMeta().getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
+            if (encoded == null) continue;
+            String[] parts = encoded.split(":");
+            if (!parts[0].equals(effect) || (parts.length > 1 && parts[1].equalsIgnoreCase("augmented")) != isAugmented) continue;
+            if (item.getAmount() > 1) item.setAmount(item.getAmount() - 1);
+            else contents[slot] = null;
+            player.getInventory().setContents(contents);
+            return true;
+        }
+        return false;
+    }
+
     @EventHandler public void inventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         String title = mini.serialize(e.getView().title());
@@ -404,37 +488,12 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             ItemStack clicked=e.getCurrentItem(); if(clicked==null) return;
             String encoded=clicked.getItemMeta().getPersistentDataContainer().get(effectKey,PersistentDataType.STRING);
             if(encoded==null) return;
-            String effect=encoded.split(":")[0]; String[] current=slots(p.getUniqueId());
-            int target = selectionMode.getOrDefault(p.getUniqueId(), 0);
-            if (!getConfig().getBoolean("settings.allow-same-effects", false) && effect.equals(current[1 - target])) {
-                p.sendMessage(mini.deserialize("<red>You cannot equip the same effect in both slots."));
-                return;
-            }
-            if (getConfig().getBoolean("settings.lock-effects", false)) {
-                List<String> primaryOnly = getConfig().getStringList("settings.primary-effects");
-                List<String> secondaryOnly = getConfig().getStringList("settings.secondary-effects");
-                if (target == 0 && secondaryOnly.contains(effect) && !primaryOnly.contains(effect)) {
-                    p.sendMessage(mini.deserialize("<red>That effect is locked to the secondary slot."));
-                    return;
-                }
-                if (target == 1 && primaryOnly.contains(effect) && !secondaryOnly.contains(effect)) {
-                    p.sendMessage(mini.deserialize("<red>That effect is locked to the primary slot."));
-                    return;
-                }
-            }
-            current[target]=effect;
-            augmented.computeIfAbsent(p.getUniqueId(), ignored -> new boolean[]{false, false})[target] = encoded.endsWith(":augmented");
-            saveData(); p.sendMessage(mini.deserialize("<green>Equipped <white>"+title(effect)+"<green> in "+(target==0?"primary":"secondary")+" slot."));
+            String effect=encoded.split(":")[0];
+            equipEffect(p, effect, encoded.endsWith(":augmented"), true);
             openMain(p);
         }
     }
 
-    @EventHandler public void interact(PlayerInteractEvent e) {
-        if(e.getItem()==null || !e.getAction().isRightClick()) return;
-        String encoded=e.getItem().getItemMeta().getPersistentDataContainer().get(effectKey,PersistentDataType.STRING);
-        if(encoded==null) return;
-        e.setCancelled(true); spark(e.getPlayer());
-    }
     private void spark(Player p) {
         spark(p, null);
     }
