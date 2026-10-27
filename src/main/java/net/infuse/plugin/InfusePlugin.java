@@ -31,6 +31,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<UUID, boolean[]> augmented = new HashMap<>();
     private final Map<UUID, String[]> controls = new HashMap<>();
     private final Map<UUID, Set<UUID>> trusted = new HashMap<>();
+    private final Map<UUID, List<String>> primaryHistory = new HashMap<>();
+    private final Map<UUID, List<String>> secondaryHistory = new HashMap<>();
     private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> hitCounters = new HashMap<>();
@@ -78,6 +80,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 equipped.put(uuid, new String[]{data.getString(id + ".primary", ""), data.getString(id + ".secondary", "")});
                 augmented.put(uuid, new boolean[]{data.getBoolean(id + ".primary-augmented", false), data.getBoolean(id + ".secondary-augmented", false)});
                 controls.put(uuid, new String[]{data.getString(id + ".primary-bind", "none"), data.getString(id + ".secondary-bind", "none")});
+                primaryHistory.put(uuid, new ArrayList<>(data.getStringList(id + ".history-primary")));
+                secondaryHistory.put(uuid, new ArrayList<>(data.getStringList(id + ".history-secondary")));
                 Set<UUID> list = new HashSet<>();
                 for (String friend : data.getStringList(id + ".trusted")) try { list.add(UUID.fromString(friend)); } catch (IllegalArgumentException ignored) {}
                 trusted.put(uuid, list);
@@ -101,6 +105,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             getConfig().set(path + ".primary-bind", control[0]);
             getConfig().set(path + ".secondary-bind", control[1]);
             getConfig().set(path + ".trusted", trusted.getOrDefault(id, Set.of()).stream().map(UUID::toString).toList());
+            getConfig().set(path + ".history-primary", primaryHistory.getOrDefault(id, List.of()));
+            getConfig().set(path + ".history-secondary", secondaryHistory.getOrDefault(id, List.of()));
         }
         saveConfig();
     }
@@ -175,6 +181,13 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
         sender.sendMessage("Usage: /infuse [gui|give|clear|spark|reload]");
         return true;
+    }
+
+    private void addHistory(UUID playerId, int slot, String effect, boolean isAugmented) {
+        Map<UUID, List<String>> historyMap = slot == 0 ? primaryHistory : secondaryHistory;
+        List<String> history = historyMap.computeIfAbsent(playerId, ignored -> new ArrayList<>());
+        history.add(effect + ":" + isAugmented + ":" + System.currentTimeMillis());
+        while (history.size() > 30) history.remove(0);
     }
 
     private boolean itemCommand(CommandSender sender, String[] args) {
