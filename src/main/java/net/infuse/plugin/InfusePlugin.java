@@ -169,18 +169,56 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         meta.displayName(mini.deserialize(name)); item.setItemMeta(meta); return item;
     }
     ItemStack createEffectItem(String effect, boolean augmented) {
-        Material material = switch(effect) {
-            case "earth" -> Material.MOSS_BLOCK; case "emerald" -> Material.EMERALD; case "ender" -> Material.ENDER_PEARL;
-            case "feather" -> Material.FEATHER; case "fire" -> Material.BLAZE_POWDER; case "frost" -> Material.PACKED_ICE;
-            case "haste" -> Material.GOLDEN_PICKAXE; case "heart" -> Material.GOLDEN_APPLE; case "invisibility" -> Material.FERMENTED_SPIDER_EYE;
-            case "ocean" -> Material.HEART_OF_THE_SEA; case "regeneration" -> Material.GHAST_TEAR; case "speed" -> Material.SUGAR;
-            case "strength" -> Material.BLAZE_ROD; case "thunder" -> Material.TRIDENT; default -> Material.AMETHYST_SHARD;
+        ItemStack item = new ItemStack(Material.POTION);
+        org.bukkit.inventory.meta.PotionMeta meta = (org.bukkit.inventory.meta.PotionMeta) item.getItemMeta();
+        String color = getConfig().getString("effects." + effect + ".color", "#A855F7");
+        java.awt.Color parsedColor;
+        try { parsedColor = java.awt.Color.decode(color); }
+        catch (NumberFormatException ignored) { parsedColor = new java.awt.Color(168, 85, 247); }
+        meta.setColor(org.bukkit.Color.fromRGB(parsedColor.getRed(), parsedColor.getGreen(), parsedColor.getBlue()));
+        int modelId = switch (effect) {
+            case "emerald" -> 414001;
+            case "feather" -> 414002;
+            case "fire" -> 414003;
+            case "frost" -> 414004;
+            case "thunder" -> 414005;
+            case "haste" -> 414006;
+            case "heart" -> 414007;
+            case "invisibility" -> 414008;
+            case "ocean" -> 414009;
+            case "regeneration" -> 414010;
+            case "speed" -> 414011;
+            case "strength" -> 414012;
+            case "ender" -> 414013;
+            case "earth" -> 414014;
+            default -> 414000;
         };
-        ItemStack item = new ItemStack(material); ItemMeta meta=item.getItemMeta();
-        meta.displayName(mini.deserialize("<bold><#A855F7>" + (augmented ? "Augmented " : "") + title(effect) + " Infuse"));
-        meta.lore(List.of(mini.deserialize("<gray>Right-click while held to activate Spark"), mini.deserialize("<dark_gray>Infuse effect: " + effect)));
+        meta.setCustomModelData(modelId + (augmented ? 100 : 0));
+        meta.displayName(mini.deserialize("<bold><" + color + ">" + (augmented ? "Augmented " : "") + title(effect) + " Effect"));
+        List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
+        lore.add(mini.deserialize("<gray>Passive effects:"));
+        lore.add(mini.deserialize("<dark_gray>• " + switch (effect) {
+            case "emerald" -> "Improved XP and loot";
+            case "feather" -> "Reduced fall damage and wind mobility";
+            case "fire" -> "Fire resistance and fire attacks";
+            case "frost" -> "Freezing attacks and ice mobility";
+            case "thunder" -> "Lightning strikes on attacks";
+            case "haste" -> "Faster mining and tool enhancements";
+            case "heart" -> "Extra health and absorption";
+            case "invisibility" -> "Invisibility and stealth";
+            case "ocean" -> "Water breathing and aquatic mobility";
+            case "regeneration" -> "Improved health regeneration";
+            case "speed" -> "Increased movement speed";
+            case "strength" -> "Improved melee damage";
+            case "ender" -> "Ender curses and teleportation";
+            default -> "Earth protection";
+        }));
+        lore.add(mini.deserialize("<gray>Spark: <white>Right-click while holding this item"));
+        lore.add(mini.deserialize("<dark_gray>Model: " + modelId + (augmented ? " (augmented)" : "")));
+        meta.lore(lore);
         meta.getPersistentDataContainer().set(effectKey, PersistentDataType.STRING, effect + (augmented ? ":augmented" : ""));
-        item.setItemMeta(meta); return item;
+        item.setItemMeta(meta);
+        return item;
     }
     String title(String effect) { return effect.substring(0,1).toUpperCase(Locale.ROOT)+effect.substring(1); }
     String display(String effect) { return effect == null || effect.isBlank() ? "None" : title(effect); }
