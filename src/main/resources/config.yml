@@ -43,6 +43,7 @@ effects:
     augment-limit: 0
     trigger-hits: 5
     ignite-ticks: 100
+    snowball-cooldown-seconds: 15
   frost:
     color: "#7AE3FC"
     cooldown-seconds: 60
@@ -80,6 +81,7 @@ effects:
     spark-seconds: 15
     craft-limit: -1
     augment-limit: 0
+    trident-pull-coefficient: 0.27
   regeneration:
     color: "#FC00DD"
     cooldown-seconds: 60
@@ -107,6 +109,8 @@ effects:
     augment-limit: 0
     trigger-hits: 10
     true-damage: 1.0
+    trident-cooldown-seconds: 10
+    lightning-chain-max: 10
   earth:
     color: "#8A795D"
     cooldown-seconds: 60
