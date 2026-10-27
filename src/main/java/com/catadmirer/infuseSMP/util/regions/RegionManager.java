@@ -1,4 +1,4 @@
-package com.catadmirer.infuseSMP.util.regions;
+package com.supainfuse.smp.util.regions;
 
 import org.bukkit.Location;
 
