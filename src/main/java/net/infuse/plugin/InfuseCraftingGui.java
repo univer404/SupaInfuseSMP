@@ -55,11 +55,14 @@ final class InfuseCraftingGui implements Listener {
         Inventory inventory = openMenus.get(player.getUniqueId());
         if (inventory == null || event.getView().getTopInventory() != inventory) return;
         int slot = event.getRawSlot();
-        if (slot >= inventory.getSize()) return;
+        if (slot >= inventory.getSize()) {
+            if (event.isShiftClick()) event.setCancelled(true);
+            return;
+        }
         if (slot == 44) { event.setCancelled(true); player.closeInventory(); return; }
         if (slot == 40) { event.setCancelled(true); craft(player, inventory); return; }
         if (!isInput(slot)) { event.setCancelled(true); return; }
-        if (event.getClick() == ClickType.NUMBER_KEY || event.getClick() == ClickType.DOUBLE_CLICK || event.getClick() == ClickType.CREATIVE) {
+        if (event.isShiftClick() || event.getClick() == ClickType.NUMBER_KEY || event.getClick() == ClickType.DOUBLE_CLICK || event.getClick() == ClickType.CREATIVE) {
             event.setCancelled(true);
             return;
         }
