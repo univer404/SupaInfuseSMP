@@ -28,6 +28,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     static final List<String> EFFECTS = List.of("earth","emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
     private final MiniMessage mini = MiniMessage.miniMessage();
     private final Map<UUID, String[]> equipped = new HashMap<>();
+    private final Map<UUID, boolean[]> augmented = new HashMap<>();
     private final Map<UUID, Set<UUID>> trusted = new HashMap<>();
     private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
@@ -68,6 +69,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             try {
                 UUID uuid = UUID.fromString(id);
                 equipped.put(uuid, new String[]{data.getString(id + ".primary", ""), data.getString(id + ".secondary", "")});
+                augmented.put(uuid, new boolean[]{data.getBoolean(id + ".primary-augmented", false), data.getBoolean(id + ".secondary-augmented", false)});
                 Set<UUID> list = new HashSet<>();
                 for (String friend : data.getStringList(id + ".trusted")) try { list.add(UUID.fromString(friend)); } catch (IllegalArgumentException ignored) {}
                 trusted.put(uuid, list);
@@ -84,6 +86,9 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             String[] values = equipped.getOrDefault(id, new String[]{"", ""});
             getConfig().set(path + ".primary", values[0]);
             getConfig().set(path + ".secondary", values[1]);
+            boolean[] isAugmented = augmented.getOrDefault(id, new boolean[]{false, false});
+            getConfig().set(path + ".primary-augmented", isAugmented[0]);
+            getConfig().set(path + ".secondary-augmented", isAugmented[1]);
             getConfig().set(path + ".trusted", trusted.getOrDefault(id, Set.of()).stream().map(UUID::toString).toList());
         }
         saveConfig();
@@ -314,6 +319,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 }
             }
             current[target]=effect;
+            augmented.computeIfAbsent(p.getUniqueId(), ignored -> new boolean[]{false, false})[target] = encoded.endsWith(":augmented");
             saveData(); p.sendMessage(mini.deserialize("<green>Equipped <white>"+title(effect)+"<green> in "+(target==0?"primary":"secondary")+" slot."));
             openMain(p);
         }
