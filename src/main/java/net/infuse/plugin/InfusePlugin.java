@@ -302,20 +302,54 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void applyPassives() {
-        for(Player p:Bukkit.getOnlinePlayers()) {
-            if(disabled(p)) continue;
-            for(String effect:slots(p.getUniqueId())) {
-                if(effect==null || effect.isBlank()) continue;
-                switch(effect) {
-                    case "speed" -> p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,40,0,true,false,true));
-                    case "haste" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,40,0,true,false,true));
-                    case "strength" -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,40,0,true,false,true));
-                    case "regeneration" -> p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,40,0,true,false,true));
-                    case "heart" -> { try { var attr=p.getAttribute(Attribute.MAX_HEALTH); if(attr!=null && attr.getBaseValue()<24) attr.setBaseValue(24); } catch(Exception ignored){} }
-                    case "invisibility" -> { if(p.isSneaking()) p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,40,0,true,false,true)); }
-                    case "ocean" -> { if(p.isInWater()) p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE,40,0,true,false,true)); }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            String[] activeSlots = slots(player.getUniqueId());
+            if (disabled(player)) continue;
+            Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
+            active.remove("");
+            if (active.contains("speed")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
+            if (active.contains("haste")) player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 0, true, false, true));
+            if (active.contains("strength")) player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 40, 0, true, false, true));
+            if (active.contains("regeneration")) player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 0, true, false, true));
+            if (active.contains("fire")) player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 40, 0, true, false, true));
+            if (active.contains("emerald")) player.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, 40, 2, true, false, true));
+            if (active.contains("ocean")) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, 40, 0, true, false, true));
+                if (player.isInWater()) player.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, 40, 0, true, false, true));
+            }
+            if (active.contains("frost") && (player.getLocation().getBlock().getType().name().contains("ICE") ||
+                    player.getLocation().subtract(0, 1, 0).getBlock().getType().name().contains("ICE") ||
+                    player.getLocation().subtract(0, 0, 0).getBlock().getType().name().contains("SNOW"))) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 0, true, false, true));
+            }
+            if (active.contains("heart")) {
+                var attribute = player.getAttribute(Attribute.MAX_HEALTH);
+                if (attribute != null && attribute.getBaseValue() < 30.0) attribute.setBaseValue(30.0);
+            } else {
+                var attribute = player.getAttribute(Attribute.MAX_HEALTH);
+                if (attribute != null && attribute.getBaseValue() == 30.0) attribute.setBaseValue(20.0);
+            }
+            if (active.contains("invisibility")) player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, true, false, true));
+            if (active.contains("ender")) {
+                for (Player other : player.getWorld().getPlayers()) {
+                    if (other.equals(player) || trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(other.getUniqueId())) continue;
+                    if (other.getLocation().distanceSquared(player.getLocation()) <= 64) {
+                        other.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 40, 0, true, false, true));
+                    }
                 }
             }
+        }
+    }
+
+    @EventHandler public void environmentalDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        String[] active = slots(player.getUniqueId());
+        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL && Arrays.asList(active).contains("feather")) {
+            event.setCancelled(true);
+        }
+        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.DROWNING && Arrays.asList(active).contains("ocean")) {
+            event.setCancelled(true);
         }
     }
     @EventHandler public void damage(EntityDamageByEntityEvent e) {
