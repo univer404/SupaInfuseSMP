@@ -90,6 +90,8 @@ effects:
     craft-limit: -1
     augment-limit: 0
     trident-pull-coefficient: 0.27
+    passive-radius: 4.0
+    drown-damage: 1.0
   regeneration:
     color: "#FC00DD"
     cooldown-seconds: 60
