@@ -609,6 +609,30 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
     }
 
+    @EventHandler
+    public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
+        Player victim = event.getEntity();
+        UUID id = victim.getUniqueId();
+        String[] current = slots(id);
+        boolean[] isAugmented = augmented.getOrDefault(id, new boolean[]{false, false});
+        if (current[0] != null && !current[0].isBlank()) event.getDrops().add(createEffectItem(current[0], isAugmented[0]));
+        if (current[1] != null && !current[1].isBlank()) event.getDrops().add(createEffectItem(current[1], isAugmented[1]));
+        current[0] = ""; current[1] = "";
+        isAugmented[0] = false; isAugmented[1] = false;
+        saveData();
+        invisiblePlayers.remove(id);
+        for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, victim);
+        var maxHealth = victim.getAttribute(Attribute.MAX_HEALTH);
+        if (maxHealth != null) maxHealth.setBaseValue(20.0);
+        if (getConfig().getBoolean("settings.head-drop", false) && victim.getKiller() != null && !victim.getKiller().equals(victim)) {
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            org.bukkit.inventory.meta.SkullMeta skull = (org.bukkit.inventory.meta.SkullMeta) head.getItemMeta();
+            skull.setOwningPlayer(victim);
+            head.setItemMeta(skull);
+            event.getDrops().add(head);
+        }
+    }
+
     @EventHandler public void environmentalDamage(org.bukkit.event.entity.EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
         String[] active = slots(player.getUniqueId());
