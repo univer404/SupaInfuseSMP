@@ -1,6 +1,6 @@
-package com.catadmirer.infuseSMP.listeners;
+package com.supainfuse.smp.listeners;
 
-import com.catadmirer.infuseSMP.Infuse;
+import com.supainfuse.smp.Infuse;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
