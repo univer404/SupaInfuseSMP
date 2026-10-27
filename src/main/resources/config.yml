@@ -114,6 +114,8 @@ effects:
     craft-limit: -1
     augment-limit: 0
     mob-damage-multiplier: 2.0
+    shield-disable-ticks: 200
+    shield-durability-damage: 20
   thunder:
     color: "#FCED00"
     cooldown-seconds: 90
