@@ -82,16 +82,20 @@ public final class EmeraldEnchantingListener implements Listener {
     private Map<Enchantment, Integer> generateEnchantments(ItemStack item, int level) {
         List<Enchantment> candidates = new ArrayList<>();
         for (Enchantment enchantment : Registry.ENCHANTMENT) {
-            if (enchantment.canEnchantItem(item)) candidates.add(enchantment);
+            if (!enchantment.canEnchantItem(item)) continue;
+            boolean conflictsWithExisting = item.getEnchantments().keySet().stream()
+                    .anyMatch(existing -> enchantment.conflictsWith(existing) || existing.conflictsWith(enchantment));
+            if (!conflictsWithExisting) candidates.add(enchantment);
         }
         Collections.shuffle(candidates);
         Map<Enchantment, Integer> result = new LinkedHashMap<>();
+        int maximumEnchantments = level >= 30 ? 3 : level >= 6 ? 2 : 1;
         for (Enchantment candidate : candidates) {
             if (!compatible(candidate, result)) continue;
             int maximum = Math.max(1, candidate.getMaxLevel());
             int chosenLevel = ThreadLocalRandom.current().nextInt(1, maximum + 1);
             result.put(candidate, chosenLevel);
-            if (result.size() >= 1 && ThreadLocalRandom.current().nextDouble() < 0.65) break;
+            if (result.size() >= maximumEnchantments) break;
         }
         return result;
     }
