@@ -1095,12 +1095,7 @@ public final class Infuse extends JavaPlugin {
             case "ocean" -> {
                 p.setRemainingAir(p.getMaximumAir());
                 p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, durationTicks, 0, true, false, true));
-                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(6, 5, 6)) {
-                    if (!(entity instanceof Player target) || target.equals(p)) continue;
-                    if (trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
-                    org.bukkit.util.Vector pull = p.getLocation().toVector().subtract(target.getLocation().toVector()).normalize().multiply(0.8);
-                    target.setVelocity(target.getVelocity().add(pull));
-                }
+                activateOceanSpark(p);
             }
             case "frost" -> {
                 p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
@@ -1134,6 +1129,27 @@ public final class Infuse extends JavaPlugin {
             case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
         }
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
+    }
+
+    private void activateOceanSpark(Player caster) {
+        int iterations = Math.max(1, getConfig().getInt("effects.ocean.pull-iterations", 50));
+        int interval = Math.max(1, getConfig().getInt("effects.ocean.pull-interval-ticks", 2));
+        double radius = Math.max(0.1, getConfig().getDouble("effects.ocean.pull-radius", 6.0));
+        double strength = Math.max(0.0, getConfig().getDouble("effects.ocean.pull-strength", 0.1));
+        Bukkit.getScheduler().runTaskTimer(this, task -> {
+            if (!caster.isOnline() || disabled(caster)) { task.cancel(); return; }
+            for (Player target : caster.getWorld().getPlayers()) {
+                if (target.equals(caster) || disabled(target) || trustManager.isTrusted(caster.getUniqueId(), target.getUniqueId())) continue;
+                if (target.getLocation().distanceSquared(caster.getLocation()) > radius * radius) continue;
+                org.bukkit.util.Vector direction = caster.getLocation().toVector().subtract(target.getLocation().toVector());
+                if (direction.lengthSquared() < 0.001) continue;
+                target.setVelocity(target.getVelocity().add(direction.normalize().multiply(strength)));
+            }
+            if (caster.getLocation().getBlock().isLiquid()) caster.setRemainingAir(caster.getMaximumAir());
+            caster.getWorld().spawnParticle(org.bukkit.Particle.BUBBLE_COLUMN_UP,
+                    caster.getLocation().add(0, 0.5, 0), 6, radius * 0.25, 0.4, radius * 0.25, 0.02);
+            task.cancel();
+        }, 0L, interval);
     }
 
     private void activateThunderSpark(Player caster) {
