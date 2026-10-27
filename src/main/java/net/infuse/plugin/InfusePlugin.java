@@ -131,7 +131,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
-            reloadConfig(); saveDefaultConfig(); sender.sendMessage(mini.deserialize(message("reload"))); return true;
+            reloadConfig(); saveDefaultConfig(); gui.reload(); recipeGui.reload(); sender.sendMessage(mini.deserialize(message("reload"))); return true;
         }
         if (args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("remove") || args[0].equalsIgnoreCase("get") || args[0].equalsIgnoreCase("history")) {
             return adminInfuseCommand(sender, args);
