@@ -88,6 +88,7 @@ public final class Infuse extends JavaPlugin implements Listener {
     private MessageManager messageManager;
     private SparkAbilityManager sparkAbilityManager;
     private InfuseGui gui;
+    private final Set<Inventory> infuseMenus = Collections.newSetFromMap(new IdentityHashMap<>());
     private RecipeBookGui recipeGui;
     private RegionManager regionManager;
     private BukkitTask passiveTask;
@@ -685,10 +686,14 @@ public final class Infuse extends JavaPlugin implements Listener {
     }
 
     private void openMain(Player p) {
-        p.openInventory(gui.buildMain(p));
+        Inventory inventory = gui.buildMain(p);
+        infuseMenus.add(inventory);
+        p.openInventory(inventory);
     }
     private void openEffects(Player p, int slot) {
-        p.openInventory(gui.buildEffects());
+        Inventory inventory = gui.buildEffects();
+        infuseMenus.add(inventory);
+        p.openInventory(inventory);
     }
     public ItemStack named(Material material, String name) {
         ItemStack item = new ItemStack(material); ItemMeta meta=item.getItemMeta();
@@ -1177,24 +1182,40 @@ public final class Infuse extends JavaPlugin implements Listener {
     @EventHandler
     public void inventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-        String title = mini.serialize(e.getView().title());
-        if (title.contains("Infuse") && !title.contains("Choose an Effect")) {
-            e.setCancelled(true);
-            if (e.getRawSlot() == 22) { p.closeInventory(); return; }
-            if (e.getRawSlot() == 13) { openEffects(p, 0); return; }
-            if (e.getRawSlot() == 11) { selectionMode.put(p.getUniqueId(), 0); openEffects(p, 0); return; }
-            if (e.getRawSlot() == 15) { selectionMode.put(p.getUniqueId(), 1); openEffects(p, 1); return; }
-        } else if (title.contains("Choose an Effect")) {
-            e.setCancelled(true);
-            if (e.getRawSlot() == 49) { p.closeInventory(); return; }
-            if (e.getRawSlot() == 45) { openMain(p); return; }
-            ItemStack clicked=e.getCurrentItem(); if(clicked==null) return;
-            String encoded=clicked.getItemMeta().getPersistentDataContainer().get(effectKey,PersistentDataType.STRING);
-            if(encoded==null) return;
-            String effect=encoded.split(":")[0];
-            equipEffect(p, effect, encoded.endsWith(":augmented"), true, selectionMode.getOrDefault(p.getUniqueId(), 0));
-            openMain(p);
+        Inventory top = e.getView().getTopInventory();
+        // Identify our menus by the actual Inventory instance, not its title.
+        // Cancel every click in the view, including shift-clicks, number keys,
+        // offhand swaps, double-click collection, and clicks in the player inventory.
+        if (!infuseMenus.contains(top)) return;
+        e.setCancelled(true);
+        int rawSlot = e.getRawSlot();
+        if (rawSlot < 0 || rawSlot >= top.getSize()) return;
+        if (top.getSize() == 27) {
+            if (rawSlot == 22) { p.closeInventory(); return; }
+            if (rawSlot == 13) { openEffects(p, 0); return; }
+            if (rawSlot == 11) { selectionMode.put(p.getUniqueId(), 0); openEffects(p, 0); return; }
+            if (rawSlot == 15) { selectionMode.put(p.getUniqueId(), 1); openEffects(p, 1); return; }
+            return;
         }
+        if (rawSlot == 49) { p.closeInventory(); return; }
+        if (rawSlot == 45) { openMain(p); return; }
+        ItemStack clicked = e.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String encoded = clicked.getItemMeta().getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
+        if (encoded == null) return;
+        String effect = encoded.split(":")[0];
+        equipEffect(p, effect, encoded.endsWith(":augmented"), true, selectionMode.getOrDefault(p.getUniqueId(), 0));
+        openMain(p);
+    }
+
+    @EventHandler
+    public void inventoryClose(InventoryCloseEvent e) {
+        infuseMenus.remove(e.getInventory());
+    }
+
+    @EventHandler
+    public void inventoryDrag(InventoryDragEvent e) {
+        if (infuseMenus.contains(e.getView().getTopInventory())) e.setCancelled(true);
     }
 
     private void spark(Player p) {
