@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 public final class InfusePlaceholders extends PlaceholderExpansion {
     private final Infuse plugin;
 
-    public InfusePlaceholderExpansion(Infuse plugin) {
+    public InfusePlaceholders(Infuse plugin) {
         this.plugin = plugin;
     }
 
