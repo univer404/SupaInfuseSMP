@@ -80,6 +80,10 @@ public final class Infuse extends JavaPlugin {
         recipeGui = new RecipeBookGui(this);
         if (Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) regionManager = new WorldGuardRegionManager(this);
         loadData();
+        if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            new InfusePlaceholders(this).register();
+            getLogger().info("PlaceholderAPI expansion registered.");
+        }
         InfuseCommandHandler commandHandler = new InfuseCommandHandler(this);
         for (String commandName : List.of("infuse", "trust", "use", "swap", "recipes", "control", "item",
                 "ldrain", "rdrain", "conf", "mapregion", "toggledisplay", "resetcraft", "resetcooldown")) {
