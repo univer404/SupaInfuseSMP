@@ -49,7 +49,7 @@ final class InfuseGui {
         List<Integer> positions = config.getIntegerList("effects.slots");
         for (int i = 0; i < InfusePlugin.EFFECTS.size() && i < positions.size(); i++) {
             int slot = positions.get(i);
-            if (slot >= 0 && slot < size) inventory.setItem(slot, plugin.createEffectItem(InfusePlugin.EFFECTS.get(i), false));
+            if (slot >= 0 && slot < size) inventory.setItem(slot, plugin.createEffectItem(InfusePlugin.EFFECTS.get(i), InfusePlugin.EFFECTS.get(i).equals("earth") || InfusePlugin.EFFECTS.get(i).equals("ender")));
         }
         set(inventory, config.getInt("effects.close-slot", 49), plugin.named(Material.BARRIER, "<red>Close"));
         set(inventory, config.getInt("effects.back-slot", 45), plugin.named(Material.ARROW, "<yellow>Back"));
