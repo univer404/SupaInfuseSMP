@@ -13,10 +13,11 @@ commands:
   trust:
     description: Manage players trusted by your Infuse effects.
     usage: /trust <add|remove|list|clear> [player]
+    aliases: [untrust]
   use:
     description: Activate the Spark in one of your Infuse slots.
     usage: /use <primary|secondary>
-    aliases: [u, activate]
+    aliases: [u, a, activate]
   swap:
     description: Swap your primary and secondary Infuse effects.
     usage: /swap
