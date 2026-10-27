@@ -21,7 +21,7 @@ final class InfuseRecipeBookGui implements Listener {
     private static final List<String> EFFECTS = List.of("emerald", "feather", "fire", "frost", "haste", "heart", "invisibility", "ocean", "regeneration", "speed", "strength", "thunder", "ender");
     private static final int[] RECIPE_SLOTS = {11, 12, 13, 20, 21, 22, 29, 30, 31};
     private final InfusePlugin plugin;
-    private final YamlConfiguration gui;
+    private YamlConfiguration gui;
     private final Map<UUID, Inventory> openMenus = new HashMap<>();
     private final Map<UUID, String> currentPage = new HashMap<>();
 
@@ -29,6 +29,8 @@ final class InfuseRecipeBookGui implements Listener {
         this.plugin = plugin;
         this.gui = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "gui.yml"));
     }
+
+    void reload() { this.gui = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "gui.yml")); }
 
     void open(Player player) { openMain(player); }
 
