@@ -1,0 +1,30 @@
+# All menu text, layout, and materials are configurable here.
+main:
+  title: "<gradient:#7c3aed:#c4b5fd>Infuse</gradient>"
+  rows: 3
+  filler: "BLACK_STAINED_GLASS_PANE"
+  filler-name: " "
+  primary-slot: 11
+  secondary-slot: 15
+  effects-slot: 13
+  close-slot: 22
+  primary:
+    material: "NETHER_STAR"
+    name: "<#C4B5FD>Primary Effect"
+    lore: ["<#AAAAAA>Click to choose your primary effect"]
+  secondary:
+    material: "AMETHYST_SHARD"
+    name: "<#A855F7>Secondary Effect"
+    lore: ["<#AAAAAA>Click to choose your secondary effect"]
+  effects:
+    material: "ENCHANTED_BOOK"
+    name: "<#C4B5FD>All Effects"
+    lore: ["<#AAAAAA>Browse Infuse effects"]
+effects:
+  title: "<gradient:#7c3aed:#c4b5fd>Choose an Effect</gradient>"
+  rows: 6
+  filler: "BLACK_STAINED_GLASS_PANE"
+  filler-name: " "
+  slots: [10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25]
+  close-slot: 49
+  back-slot: 45
