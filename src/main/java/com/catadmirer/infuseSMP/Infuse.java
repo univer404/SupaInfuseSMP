@@ -65,6 +65,7 @@ public final class Infuse extends JavaPlugin {
     private final Map<String, Long> sparkEnds = new HashMap<>();
     private final Map<UUID, Long> trustActionCooldowns = new HashMap<>();
     private final Set<UUID> invisiblePlayers = new HashSet<>();
+    private final Set<UUID> regenFoodWindow = new HashSet<>();
     private final Map<UUID, Integer> oceanAir = new HashMap<>();
     private final Map<UUID, Long> oceanLastActive = new HashMap<>();
     private final Set<UUID> fireGlidingPlayers = new HashSet<>();
@@ -799,6 +800,27 @@ public final class Infuse extends JavaPlugin {
     }
 
     @EventHandler
+    public void prepareRegenerationFood(PlayerInteractEvent event) {
+        if (!event.getAction().isRightClick() || event.getItem() == null || !event.getItem().getType().isEdible()) return;
+        Player player = event.getPlayer();
+        UUID id = player.getUniqueId();
+        if (disabled(player) || !Arrays.asList(slots(id)).contains("regeneration") || player.getFoodLevel() < 20) return;
+        regenFoodWindow.add(id);
+        player.setFoodLevel(19);
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            regenFoodWindow.remove(id);
+            Player online = Bukkit.getPlayer(id);
+            if (online != null && Arrays.asList(slots(id)).contains("regeneration")) online.setFoodLevel(20);
+        }, 2L);
+    }
+
+    public void onFoodLevelChange(org.bukkit.event.entity.FoodLevelChangeEvent event) {
+        if (!(event.getEntity() instanceof Player player) || disabled(player)) return;
+        UUID id = player.getUniqueId();
+        if (!Arrays.asList(slots(id)).contains("regeneration") || regenFoodWindow.contains(id)) return;
+        event.setFoodLevel(20);
+    }
+
     public void onEffectPotionConsume(org.bukkit.event.player.PlayerItemConsumeEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
@@ -812,6 +834,11 @@ public final class Infuse extends JavaPlugin {
                 int amplifier = Math.max(0, getConfig().getInt(goldenApple ? "effects.heart.egap-absorption-tier" : "effects.heart.food-absorption-tier", goldenApple ? 4 : 0));
                 int duration = getConfig().getInt(goldenApple ? "effects.heart.egap-absorption-duration-ticks" : "effects.heart.food-absorption-duration-ticks", 1200);
                 player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, duration, amplifier, true, false, true));
+            }
+            if (Arrays.asList(activeSlots).contains("regeneration") && item.getType().isEdible()) {
+                float saturation = (float) getConfig().getDouble("effects.regeneration.food-saturation", 3.0);
+                player.setSaturation(Math.min(20.0f, player.getSaturation() + saturation));
+                player.setFoodLevel(20);
             }
             if (Arrays.asList(activeSlots).contains("emerald")) {
                 String key = player.getUniqueId() + ":emerald";
