@@ -1302,11 +1302,15 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 player.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, 40, 0, true, false, true));
                 if (player.isInWater()) player.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, 40, 0, true, false, true));
             }
-            if (active.contains("frost") && (player.getLocation().getBlock().getType().name().contains("ICE") ||
-                    player.getLocation().subtract(0, 1, 0).getBlock().getType().name().contains("ICE") ||
-                    player.getLocation().subtract(0, 0, 0).getBlock().getType().name().contains("SNOW"))) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 0, true, false, true));
+            if (active.contains("frost")) {
+                player.setFreezeTicks(0);
+                Material feet = player.getLocation().getBlock().getType();
+                Material underfoot = player.getLocation().clone().subtract(0, 1, 0).getBlock().getType();
+                if (feet.name().contains("ICE") || underfoot.name().contains("ICE") || feet.name().contains("SNOW") || underfoot.name().contains("SNOW")) {
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 0, true, false, true));
+                }
+                if (feet == Material.POWDER_SNOW) player.setVelocity(player.getVelocity().setY(Math.max(0.1, player.getVelocity().getY())));
             }
             if (active.contains("heart")) {
                 var attribute = player.getAttribute(Attribute.MAX_HEALTH);
