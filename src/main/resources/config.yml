@@ -36,6 +36,13 @@ effects:
     spark-seconds: 15
     craft-limit: -1
     augment-limit: 0
+    initial-bounce-power: 1.2
+    fall-trigger-threshold: 4.0
+    min-shockwave-radius: 2.0
+    max-shockwave-radius: 8.0
+    shockwave-true-damage: 2.0
+    slow-falling-duration-ticks: 100
+    bounce-coefficient: 4.0
   fire:
     color: "#FC7803"
     cooldown-seconds: 90
