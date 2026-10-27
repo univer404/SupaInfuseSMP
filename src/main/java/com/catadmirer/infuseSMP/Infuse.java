@@ -1874,6 +1874,14 @@ public final class Infuse extends JavaPlugin {
     @EventHandler
     public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
         Player victim = event.getEntity();
+        Player killer = victim.getKiller();
+        if (killer != null && hasEffect(killer, "invisibility")) {
+            String deathMessage = event.getDeathMessage();
+            if (deathMessage != null) {
+                event.setDeathMessage(deathMessage.replace(killer.getName(),
+                        "§k" + "i".repeat(Math.max(3, killer.getName().length())) + "§r"));
+            }
+        }
         UUID id = victim.getUniqueId();
         String[] current = slots(id);
         boolean[] isAugmented = augmented.getOrDefault(id, new boolean[]{false, false});
@@ -2056,14 +2064,19 @@ public final class Infuse extends JavaPlugin {
                         getConfig().getDouble("effects.thunder.lightning-chain-radius", 12.0));
             }
         }
-        if (active.contains("frost") && countHit(attacker, "frost") % Math.max(1, getConfig().getInt("effects.frost.trigger-hits", 10)) == 0) {
-            target.setFreezeTicks(Math.max(target.getFreezeTicks(), getConfig().getInt("effects.frost.freeze-ticks", 600)));
-            target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE,
-                    Math.max(1, getConfig().getInt("effects.frost.mining-fatigue-duration-ticks", 200)),
-                    Math.max(0, getConfig().getInt("effects.frost.mining-fatigue-amplifier", 1)), true, false, true));
-            if (target instanceof Player frostVictim) {
-                windChargeCooldowns.put(frostVictim.getUniqueId(), System.currentTimeMillis()
-                        + Math.max(0, getConfig().getLong("effects.frost.wind-charge-cooldown-seconds", 10)) * 1000L);
+        if (active.contains("frost")) {
+            boolean frostSparkActive = sparkEnds.getOrDefault(attacker.getUniqueId() + ":frost", 0L) > System.currentTimeMillis();
+            int frostHits = countHit(attacker, "frost");
+            boolean frostTriggered = frostSparkActive || frostHits % Math.max(1, getConfig().getInt("effects.frost.trigger-hits", 10)) == 0;
+            if (frostTriggered) {
+                target.setFreezeTicks(Math.max(target.getFreezeTicks(), getConfig().getInt("effects.frost.freeze-ticks", 600)));
+                target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE,
+                        Math.max(1, getConfig().getInt("effects.frost.mining-fatigue-duration-ticks", 200)),
+                        Math.max(0, getConfig().getInt("effects.frost.mining-fatigue-amplifier", 1)), true, false, true));
+                if (!frostSparkActive && target instanceof Player frostVictim) {
+                    windChargeCooldowns.put(frostVictim.getUniqueId(), System.currentTimeMillis()
+                            + Math.max(0, getConfig().getLong("effects.frost.wind-charge-cooldown-seconds", 10)) * 1000L);
+                }
             }
         }
         if (active.contains("invisibility") && countHit(attacker, "invisibility") % getConfig().getInt("effects.invisibility.trigger-hits", 10) == 0) {
