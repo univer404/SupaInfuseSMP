@@ -797,8 +797,9 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, durationTicks, 0, true, false, true));
         Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (Arrays.asList(slots(player.getUniqueId())).contains("invisibility")) return;
             invisiblePlayers.remove(player.getUniqueId());
-            if (!Arrays.asList(slots(player.getUniqueId())).contains("invisibility")) player.setCollidable(true);
+            player.setCollidable(true);
             for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
         }, durationTicks);
     }
