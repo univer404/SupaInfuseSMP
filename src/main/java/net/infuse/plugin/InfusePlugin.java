@@ -1379,6 +1379,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         isAugmented[0] = false; isAugmented[1] = false;
         saveData();
         invisiblePlayers.remove(id);
+        windCharges.remove(id);
         victim.setCollidable(true);
         for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, victim);
         var maxHealth = victim.getAttribute(Attribute.MAX_HEALTH);
@@ -1557,8 +1558,16 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         for (int i = 0; i < configured.length; i++) {
             if (configured[i].equalsIgnoreCase("sneak")) {
                 spark(player, i == 0 ? "primary" : "secondary");
-                return;
+                break;
             }
+        }
+        int charges = windCharges.getOrDefault(player.getUniqueId(), 0);
+        if (charges > 0 && !disabled(player)) {
+            windCharges.put(player.getUniqueId(), charges - 1);
+            org.bukkit.entity.WindCharge charge = player.getWorld().spawn(player.getEyeLocation(), org.bukkit.entity.WindCharge.class);
+            charge.setShooter(player);
+            charge.setVelocity(player.getLocation().getDirection().multiply(2.0));
+            player.playSound(player.getLocation(), "entity.wind_charge.throw", 1.0f, 1.0f);
         }
     }
 
