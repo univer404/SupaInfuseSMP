@@ -2,6 +2,7 @@ package com.catadmirer.infuseSMP;
 
 import com.catadmirer.infuseSMP.effects.EffectRegistry;
 import com.catadmirer.infuseSMP.managers.MessageManager;
+import com.catadmirer.infuseSMP.util.trust.TrustManager;
 import com.catadmirer.infuseSMP.gui.CraftingGui;
 import com.catadmirer.infuseSMP.gui.InfuseGui;
 import com.catadmirer.infuseSMP.gui.RecipeBookGui;
@@ -45,7 +46,7 @@ public final class Infuse extends JavaPlugin {
     private final Map<UUID, String[]> equipped = new HashMap<>();
     private final Map<UUID, boolean[]> augmented = new HashMap<>();
     private final Map<UUID, String[]> controls = new HashMap<>();
-    private final Map<UUID, Set<UUID>> trusted = new HashMap<>();
+    private final TrustManager trustManager = new TrustManager();
     private final Map<UUID, List<String>> primaryHistory = new HashMap<>();
     private final Map<UUID, List<String>> secondaryHistory = new HashMap<>();
     private final Map<UUID, Boolean> displayEnabled = new HashMap<>();
@@ -132,7 +133,7 @@ public final class Infuse extends JavaPlugin {
                 displayEnabled.put(uuid, data.getBoolean(id + ".display-enabled", true));
                 Set<UUID> list = new HashSet<>();
                 for (String friend : data.getStringList(id + ".trusted")) try { list.add(UUID.fromString(friend)); } catch (IllegalArgumentException ignored) {}
-                trusted.put(uuid, list);
+                trustManager.setTrusted(uuid, list);
             } catch (IllegalArgumentException ignored) {}
         }
     }
@@ -140,7 +141,7 @@ public final class Infuse extends JavaPlugin {
     private void saveData() {
         getConfig().set("players", null);
         Set<UUID> playerIds = new HashSet<>(equipped.keySet());
-        playerIds.addAll(trusted.keySet());
+        playerIds.addAll(trustManager.playerIds());
         for (UUID id : playerIds) {
             String path = "players." + id;
             String[] values = equipped.getOrDefault(id, new String[]{"", ""});
@@ -152,7 +153,7 @@ public final class Infuse extends JavaPlugin {
             String[] control = controls.getOrDefault(id, new String[]{"none", "none"});
             getConfig().set(path + ".primary-bind", control[0]);
             getConfig().set(path + ".secondary-bind", control[1]);
-            getConfig().set(path + ".trusted", trusted.getOrDefault(id, Set.of()).stream().map(UUID::toString).toList());
+            getConfig().set(path + ".trusted", trustManager.getTrusted(id).stream().map(UUID::toString).toList());
             getConfig().set(path + ".history-primary", primaryHistory.getOrDefault(id, List.of()));
             getConfig().set(path + ".history-secondary", secondaryHistory.getOrDefault(id, List.of()));
             getConfig().set(path + ".display-enabled", displayEnabled.getOrDefault(id, true));
@@ -589,7 +590,7 @@ public final class Infuse extends JavaPlugin {
     private boolean trustCommand(CommandSender sender, String[] args) {
         if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
         if (args.length == 0) { p.sendMessage("/trust <add|remove|list|clear> [player]"); return true; }
-        Set<UUID> list = trusted.computeIfAbsent(p.getUniqueId(), ignored -> new HashSet<>());
+        Set<UUID> list = trustManager.getOrCreate(p.getUniqueId());
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "add" -> {
                 if (args.length < 2) { p.sendMessage("/trust add <player>"); return true; }
@@ -604,7 +605,7 @@ public final class Infuse extends JavaPlugin {
                 long delay = Math.max(0, getConfig().getLong("settings.trust-list-delay-seconds", 10));
                 p.sendMessage(mini.deserialize("<yellow>Trust update queued. It will apply in " + delay + " seconds."));
                 Bukkit.getScheduler().runTaskLater(this, () -> {
-                    Set<UUID> current = trusted.computeIfAbsent(ownerId, ignored -> new HashSet<>());
+                    Set<UUID> current = trustManager.getOrCreate(ownerId);
                     if (!current.contains(targetId) && current.size() >= getConfig().getInt("settings.trust-list-max", 3)) {
                         Player owner = Bukkit.getPlayer(ownerId);
                         if (owner != null) tell(owner, "trust-limit");
@@ -624,7 +625,7 @@ public final class Infuse extends JavaPlugin {
                 long delay = Math.max(0, getConfig().getLong("settings.trust-list-delay-seconds", 10));
                 p.sendMessage(mini.deserialize("<yellow>Trust update queued. It will apply in " + delay + " seconds."));
                 Bukkit.getScheduler().runTaskLater(this, () -> {
-                    trusted.computeIfAbsent(ownerId, ignored -> new HashSet<>()).remove(targetId);
+                    trustManager.getOrCreate(ownerId).remove(targetId);
                     saveData();
                     Player owner = Bukkit.getPlayer(ownerId);
                     if (owner != null) owner.sendMessage(mini.deserialize(message("trust-removed").replace("{player}", targetName)));
@@ -737,7 +738,7 @@ public final class Infuse extends JavaPlugin {
     public void invisibilityRangedHit(org.bukkit.event.entity.ProjectileHitEvent event) {
         if (!(event.getEntity().getShooter() instanceof Player shooter) || !(event.getHitEntity() instanceof org.bukkit.entity.LivingEntity target) || disabled(shooter)) return;
         if (!Arrays.asList(slots(shooter.getUniqueId())).contains("invisibility")) return;
-        if (target instanceof Player victim && trusted.getOrDefault(shooter.getUniqueId(), Set.of()).contains(victim.getUniqueId())) return;
+        if (target instanceof Player victim && trustManager.getTrusted(shooter.getUniqueId()).contains(victim.getUniqueId())) return;
         target.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 200, 0, true, false, true));
     }
 
@@ -754,7 +755,7 @@ public final class Infuse extends JavaPlugin {
             }
         }
         if (Arrays.asList(slots(player.getUniqueId())).contains("ocean") && event.getHitEntity() instanceof Player target &&
-                !trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(target.getUniqueId())) {
+                !trustManager.getTrusted(player.getUniqueId()).contains(target.getUniqueId())) {
             org.bukkit.util.Vector pull = player.getLocation().toVector().subtract(target.getLocation().toVector()).normalize().multiply(getConfig().getDouble("effects.ocean.trident-pull-coefficient", 0.27));
             target.setVelocity(target.getVelocity().add(pull));
         }
@@ -1001,7 +1002,7 @@ public final class Infuse extends JavaPlugin {
                 p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationTicks, 1, true, false, true));
                 for (org.bukkit.entity.Entity entity : p.getNearbyEntities(1.5, 1.5, 1.5)) {
                     if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
-                    if (entity instanceof Player target && trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    if (entity instanceof Player target && trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
                     living.damage(getConfig().getDouble("effects.speed.dash-true-damage", 2.0), p);
                     p.getWorld().spawnParticle(org.bukkit.Particle.SWEEP_ATTACK, living.getLocation().add(0, 1, 0), 4, 0.3, 0.3, 0.3, 0);
                 }
@@ -1032,7 +1033,7 @@ public final class Infuse extends JavaPlugin {
                 p.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, durationTicks, 0, true, false, true));
                 for (org.bukkit.entity.Entity entity : p.getNearbyEntities(6, 4, 6)) {
                     if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
-                    if (entity instanceof Player target && trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    if (entity instanceof Player target && trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
                     living.setFireTicks(Math.max(living.getFireTicks(), getConfig().getInt("effects.fire.ignite-ticks", 100)));
                     living.setVelocity(living.getVelocity().setY(Math.max(0.7, living.getVelocity().getY())));
                 }
@@ -1041,7 +1042,7 @@ public final class Infuse extends JavaPlugin {
                 int strikes = 0;
                 for (org.bukkit.entity.Entity entity : p.getNearbyEntities(20, 10, 20)) {
                     if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
-                    if (entity instanceof Player target && trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    if (entity instanceof Player target && trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
                     p.getWorld().strikeLightning(living.getLocation());
                     if (++strikes >= getConfig().getInt("effects.thunder.lightning-chain-max", 10)) break;
                 }
@@ -1051,7 +1052,7 @@ public final class Infuse extends JavaPlugin {
                 p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, durationTicks, 0, true, false, true));
                 for (org.bukkit.entity.Entity entity : p.getNearbyEntities(6, 5, 6)) {
                     if (!(entity instanceof Player target) || target.equals(p)) continue;
-                    if (trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    if (trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
                     org.bukkit.util.Vector pull = p.getLocation().toVector().subtract(target.getLocation().toVector()).normalize().multiply(0.8);
                     target.setVelocity(target.getVelocity().add(pull));
                 }
@@ -1060,7 +1061,7 @@ public final class Infuse extends JavaPlugin {
                 p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
                 for (org.bukkit.entity.Entity entity : p.getNearbyEntities(8, 5, 8)) {
                     if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
-                    if (entity instanceof Player target && trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    if (entity instanceof Player target && trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
                     living.setFreezeTicks(Math.max(living.getFreezeTicks(), getConfig().getInt("effects.frost.freeze-ticks", 600)));
                     living.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, durationTicks, 1, true, false, true));
                 }
@@ -1074,7 +1075,7 @@ public final class Infuse extends JavaPlugin {
                 }
                 for (org.bukkit.entity.Entity entity : p.getNearbyEntities(2, 2, 2)) {
                     if (entity instanceof Player target) {
-                        if (trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                        if (trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
                         target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, durationTicks, 0, true, false, true));
                         cooldowns.remove(key);
                     } else if (entity instanceof org.bukkit.entity.LivingEntity living &&
@@ -1109,7 +1110,7 @@ public final class Infuse extends JavaPlugin {
             player.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, impact, 60, radius / 3.0, 0.25, radius / 3.0, 0.05);
             for (org.bukkit.entity.Entity entity : player.getNearbyEntities(radius, radius, radius)) {
                 if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(player)) continue;
-                if (entity instanceof Player target && trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                if (entity instanceof Player target && trustManager.getTrusted(player.getUniqueId()).contains(target.getUniqueId())) continue;
                 living.damage(getConfig().getDouble("effects.feather.shockwave-true-damage", 2.0), player);
                 living.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,
                         getConfig().getInt("effects.feather.slow-falling-duration-ticks", 100), 0, true, false, true));
@@ -1262,7 +1263,7 @@ public final class Infuse extends JavaPlugin {
             double radius = getConfig().getDouble("effects.ocean.passive-radius", 4.0);
             for (Player target : caster.getWorld().getPlayers()) {
                 if (target.equals(caster) || disabled(target) || target.getLocation().distanceSquared(caster.getLocation()) > radius * radius) continue;
-                if (trusted.getOrDefault(caster.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                if (trustManager.getTrusted(caster.getUniqueId()).contains(target.getUniqueId())) continue;
                 if (target.getEyeLocation().getBlock().isLiquid() == false || target.hasPotionEffect(PotionEffectType.WATER_BREATHING)) continue;
                 UUID targetId = target.getUniqueId();
                 int respiration = 0;
@@ -1313,7 +1314,7 @@ public final class Infuse extends JavaPlugin {
         double amount = Math.max(1.0, caster.getMaxHealth() * percentage);
         caster.setHealth(Math.min(caster.getMaxHealth(), caster.getHealth() + amount));
         for (Player target : caster.getWorld().getPlayers()) {
-            if (target.equals(caster) || !trusted.getOrDefault(caster.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+            if (target.equals(caster) || !trustManager.getTrusted(caster.getUniqueId()).contains(target.getUniqueId())) continue;
             if (target.getLocation().distanceSquared(caster.getLocation()) > radius * radius) continue;
             target.setHealth(Math.min(target.getMaxHealth(), target.getHealth() + amount));
         }
@@ -1325,12 +1326,12 @@ public final class Infuse extends JavaPlugin {
         player.getWorld().spawnParticle(org.bukkit.Particle.SQUID_INK, player.getLocation().add(0, 1, 0), 80, 2.0, 1.0, 2.0, 0.02);
         for (org.bukkit.entity.Entity entity : player.getNearbyEntities(8, 5, 8)) {
             if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(player)) continue;
-            if (entity instanceof Player target && trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+            if (entity instanceof Player target && trustManager.getTrusted(player.getUniqueId()).contains(target.getUniqueId())) continue;
             living.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, durationTicks, 0, true, false, true));
             living.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, durationTicks, 0, true, false, true));
         }
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (viewer.equals(player) || trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(viewer.getUniqueId())) {
+            if (viewer.equals(player) || trustManager.getTrusted(player.getUniqueId()).contains(viewer.getUniqueId())) {
                 viewer.showPlayer(this, player);
             } else {
                 viewer.hidePlayer(this, player);
@@ -1419,7 +1420,7 @@ public final class Infuse extends JavaPlugin {
                 player.setCollidable(false);
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, true, false, true));
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
-                    if (viewer.equals(player) || trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(viewer.getUniqueId())) viewer.showPlayer(this, player);
+                    if (viewer.equals(player) || trustManager.getTrusted(player.getUniqueId()).contains(viewer.getUniqueId())) viewer.showPlayer(this, player);
                     else viewer.hidePlayer(this, player);
                 }
             } else if (invisiblePlayers.remove(player.getUniqueId())) {
@@ -1433,7 +1434,7 @@ public final class Infuse extends JavaPlugin {
             }
             if (active.contains("ender")) {
                 for (Player other : player.getWorld().getPlayers()) {
-                    if (other.equals(player) || trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(other.getUniqueId())) continue;
+                    if (other.equals(player) || trustManager.getTrusted(player.getUniqueId()).contains(other.getUniqueId())) continue;
                     if (other.getLocation().distanceSquared(player.getLocation()) <= 64) {
                         other.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 40, 0, true, false, true));
                     }
@@ -1508,7 +1509,7 @@ public final class Infuse extends JavaPlugin {
     @EventHandler public void damage(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player attacker) || disabled(attacker)) return;
         if (!(event.getEntity() instanceof org.bukkit.entity.LivingEntity target)) return;
-        boolean trustedTarget = target instanceof Player victim && trusted.getOrDefault(attacker.getUniqueId(), Set.of()).contains(victim.getUniqueId());
+        boolean trustedTarget = target instanceof Player victim && trustManager.getTrusted(attacker.getUniqueId()).contains(victim.getUniqueId());
         String[] activeSlots = slots(attacker.getUniqueId());
         Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
         active.remove("");
@@ -1725,8 +1726,8 @@ public final class Infuse extends JavaPlugin {
         }
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (online.equals(joining)) continue;
-            if (invisiblePlayers.contains(online.getUniqueId()) && !trusted.getOrDefault(online.getUniqueId(), Set.of()).contains(joining.getUniqueId())) joining.hidePlayer(this, online);
-            if (invisiblePlayers.contains(joining.getUniqueId()) && !trusted.getOrDefault(joining.getUniqueId(), Set.of()).contains(online.getUniqueId())) online.hidePlayer(this, joining);
+            if (invisiblePlayers.contains(online.getUniqueId()) && !trustManager.getTrusted(online.getUniqueId()).contains(joining.getUniqueId())) joining.hidePlayer(this, online);
+            if (invisiblePlayers.contains(joining.getUniqueId()) && !trustManager.getTrusted(joining.getUniqueId()).contains(online.getUniqueId())) online.hidePlayer(this, joining);
         }
         String url=getConfig().getString("settings.resource-pack.url","");
         if(getConfig().getBoolean("settings.resource-pack.enabled") && !url.isBlank()) {
