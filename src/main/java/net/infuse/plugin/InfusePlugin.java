@@ -782,8 +782,9 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 }
             }
             case "feather" -> {
-                p.setVelocity(p.getVelocity().setY(Math.max(1.1, p.getVelocity().getY())));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, durationTicks, 0, true, false, true));
+                p.setVelocity(p.getVelocity().setY(0));
+                p.setVelocity(p.getVelocity().setY(getConfig().getDouble("effects.feather.initial-bounce-power", 1.2)));
+                activateFeatherShockwave(p);
             }
             case "haste" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, durationTicks, 255, true, false, true));
             case "strength" -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, durationTicks, 1, true, false, true));
@@ -862,6 +863,37 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
         }
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
+    }
+
+    private void activateFeatherShockwave(Player player) {
+        final int[] ticks = {0};
+        final double[] maxFallDistance = {0.0};
+        final boolean[] leftGround = {false};
+        Bukkit.getScheduler().runTaskTimer(this, task -> {
+            if (!player.isOnline() || ticks[0] > 100) { task.cancel(); return; }
+            ticks[0]++;
+            maxFallDistance[0] = Math.max(maxFallDistance[0], player.getFallDistance());
+            if (!player.isOnGround()) leftGround[0] = true;
+            if (!leftGround[0] || !player.isOnGround() || ticks[0] < 4) return;
+            task.cancel();
+            if (maxFallDistance[0] <= getConfig().getDouble("effects.feather.fall-trigger-threshold", 4.0)) return;
+            double radius = Math.max(getConfig().getDouble("effects.feather.min-shockwave-radius", 2.0),
+                    Math.min(getConfig().getDouble("effects.feather.max-shockwave-radius", 8.0), maxFallDistance[0] / 4.0));
+            org.bukkit.Location impact = player.getLocation();
+            player.playSound(impact, "item.mace.smash_ground_heavy", 1.0f, 1.0f);
+            player.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, impact, 60, radius / 3.0, 0.25, radius / 3.0, 0.05);
+            for (org.bukkit.entity.Entity entity : player.getNearbyEntities(radius, radius, radius)) {
+                if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(player)) continue;
+                if (entity instanceof Player target && trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                living.damage(getConfig().getDouble("effects.feather.shockwave-true-damage", 2.0), player);
+                living.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,
+                        getConfig().getInt("effects.feather.slow-falling-duration-ticks", 100), 0, true, false, true));
+            }
+            if (!player.isSneaking()) {
+                org.bukkit.util.Vector direction = player.getLocation().getDirection();
+                player.setVelocity(direction.multiply(radius / Math.max(1.0, getConfig().getDouble("effects.feather.bounce-coefficient", 4.0))));
+            }
+        }, 1L, 1L);
     }
 
     private void activateRegenerationSpark(Player caster) {
