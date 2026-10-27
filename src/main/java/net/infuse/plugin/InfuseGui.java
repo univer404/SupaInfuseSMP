@@ -14,13 +14,15 @@ import java.util.List;
 /** Builds the configurable Infuse menus. Menu layout lives in gui.yml. */
 final class InfuseGui {
     private final InfusePlugin plugin;
-    private final YamlConfiguration config;
+    private YamlConfiguration config;
 
     InfuseGui(InfusePlugin plugin) {
         this.plugin = plugin;
         File file = new File(plugin.getDataFolder(), "gui.yml");
         this.config = YamlConfiguration.loadConfiguration(file);
     }
+
+    void reload() { this.config = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "gui.yml")); }
 
     Inventory buildMain(Player player) {
         int size = inventorySize("main.rows", 3);
