@@ -35,6 +35,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> hitCounters = new HashMap<>();
     private final Map<UUID, Long> trustActionCooldowns = new HashMap<>();
+    private final Set<UUID> invisiblePlayers = new HashSet<>();
     private NamespacedKey effectKey;
     private InfuseGui gui;
     private InfuseRecipeBookGui recipeGui;
@@ -442,21 +443,113 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         long cooldownSeconds = Math.max(0, getConfig().getLong("effects." + effect + ".cooldown-seconds", 60));
         int durationTicks = (int) Math.max(1, getConfig().getLong("effects." + effect + ".spark-seconds", 15) * 20L);
         cooldowns.put(key, now + cooldownSeconds * 1000L);
-        switch(effect) {
-            case "speed","feather" -> p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,durationTicks,1,true,false,true));
-            case "haste" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,durationTicks,1,true,false,true));
-            case "strength" -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,durationTicks,1,true,false,true));
-            case "regeneration","heart" -> p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,durationTicks,1,true,false,true));
-            case "invisibility" -> p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,durationTicks,0,true,false,true));
-            case "fire" -> { p.setFireTicks(0); p.getNearbyEntities(5,3,5).stream().filter(ent -> ent instanceof org.bukkit.entity.LivingEntity).map(ent -> (org.bukkit.entity.LivingEntity)ent).filter(ent -> !ent.equals(p)).forEach(ent -> ent.setFireTicks(100)); }
-            case "thunder" -> p.getNearbyEntities(8,5,8).stream().filter(ent -> ent instanceof org.bukkit.entity.LivingEntity).map(ent -> (org.bukkit.entity.LivingEntity)ent).filter(ent -> !ent.equals(p)).forEach(ent -> p.getWorld().strikeLightning(ent.getLocation()));
-            case "ocean" -> { p.setRemainingAir(p.getMaximumAir()); p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE,durationTicks,0,true,false,true)); }
-            case "frost" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,durationTicks,1,true,false,true));
-            case "emerald" -> p.giveExp(10);
-            case "ender" -> { org.bukkit.Location destination = p.getTargetBlockExact(24) == null ? null : p.getTargetBlockExact(24).getLocation().add(0.5, 1, 0.5); if (destination != null && destination.getWorld() == p.getWorld()) p.teleport(destination); }
-            case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,100,1,true,false,true));
+        switch (effect) {
+            case "speed" -> {
+                org.bukkit.util.Vector direction = p.getLocation().getDirection().setY(0).normalize().multiply(getConfig().getDouble("effects.speed.dash-power", 2.6));
+                p.setVelocity(direction.setY(Math.max(0.15, p.getVelocity().getY())));
+                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationTicks, 1, true, false, true));
+            }
+            case "feather" -> {
+                p.setVelocity(p.getVelocity().setY(Math.max(1.1, p.getVelocity().getY())));
+                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, durationTicks, 0, true, false, true));
+            }
+            case "haste" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, durationTicks, 1, true, false, true));
+            case "strength" -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, durationTicks, 1, true, false, true));
+            case "regeneration" -> {
+                p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, durationTicks, 1, true, false, true));
+                healTrustedNearby(p, 8, 0.2);
+            }
+            case "heart" -> {
+                var attribute = p.getAttribute(Attribute.MAX_HEALTH);
+                if (attribute != null) attribute.setBaseValue(40.0);
+                p.setHealth(Math.min(40.0, p.getHealth() + Math.max(2.0, p.getMaxHealth() * getConfig().getDouble("effects.heart.spark-heal-percentage", 0.2))));
+                Bukkit.getScheduler().runTaskLater(this, () -> {
+                    if (!p.isOnline()) return;
+                    var currentAttribute = p.getAttribute(Attribute.MAX_HEALTH);
+                    double restoredMax = Arrays.asList(slots(p.getUniqueId())).contains("heart") ? 30.0 : 20.0;
+                    if (currentAttribute != null) currentAttribute.setBaseValue(restoredMax);
+                    if (p.getHealth() > restoredMax) p.setHealth(restoredMax);
+                }, durationTicks);
+            }
+            case "invisibility" -> activateInvisibility(p, durationTicks);
+            case "fire" -> {
+                p.setFireTicks(0);
+                p.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, durationTicks, 0, true, false, true));
+                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(6, 4, 6)) {
+                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
+                    if (entity instanceof Player target && trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    living.setFireTicks(Math.max(living.getFireTicks(), getConfig().getInt("effects.fire.ignite-ticks", 100)));
+                    living.setVelocity(living.getVelocity().setY(Math.max(0.7, living.getVelocity().getY())));
+                }
+            }
+            case "thunder" -> {
+                int strikes = 0;
+                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(20, 10, 20)) {
+                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
+                    if (entity instanceof Player target && trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    p.getWorld().strikeLightning(living.getLocation());
+                    if (++strikes >= getConfig().getInt("effects.thunder.lightning-chain-max", 10)) break;
+                }
+            }
+            case "ocean" -> {
+                p.setRemainingAir(p.getMaximumAir());
+                p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, durationTicks, 0, true, false, true));
+                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(6, 5, 6)) {
+                    if (!(entity instanceof Player target) || target.equals(p)) continue;
+                    if (trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    org.bukkit.util.Vector pull = p.getLocation().toVector().subtract(target.getLocation().toVector()).normalize().multiply(0.8);
+                    target.setVelocity(target.getVelocity().add(pull));
+                }
+            }
+            case "frost" -> {
+                p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
+                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(8, 5, 8)) {
+                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
+                    if (entity instanceof Player target && trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    living.setFreezeTicks(Math.max(living.getFreezeTicks(), getConfig().getInt("effects.frost.freeze-ticks", 600)));
+                    living.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, durationTicks, 1, true, false, true));
+                }
+            }
+            case "emerald" -> {
+                p.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, durationTicks, 4, true, false, true));
+                p.giveExp(getConfig().getInt("effects.emerald.spark-xp-gain", 2));
+            }
+            case "ender" -> {
+                org.bukkit.block.Block targetBlock = p.getTargetBlockExact(15);
+                if (targetBlock != null && targetBlock.getType().isSolid()) {
+                    org.bukkit.Location destination = targetBlock.getLocation().add(0.5, 1, 0.5);
+                    if (destination.getWorld() == p.getWorld() && destination.distanceSquared(p.getLocation()) <= 225) p.teleport(destination);
+                }
+            }
+            case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
         }
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
+    }
+
+    private void healTrustedNearby(Player caster, double radius, double percentage) {
+        double amount = Math.max(1.0, caster.getMaxHealth() * percentage);
+        caster.setHealth(Math.min(caster.getMaxHealth(), caster.getHealth() + amount));
+        for (Player target : caster.getWorld().getPlayers()) {
+            if (target.equals(caster) || !trusted.getOrDefault(caster.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+            if (target.getLocation().distanceSquared(caster.getLocation()) > radius * radius) continue;
+            target.setHealth(Math.min(target.getMaxHealth(), target.getHealth() + amount));
+        }
+    }
+
+    private void activateInvisibility(Player player, int durationTicks) {
+        invisiblePlayers.add(player.getUniqueId());
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (viewer.equals(player) || trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(viewer.getUniqueId())) {
+                viewer.showPlayer(this, player);
+            } else {
+                viewer.hidePlayer(this, player);
+            }
+        }
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, durationTicks, 0, true, false, true));
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            invisiblePlayers.remove(player.getUniqueId());
+            for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
+        }, durationTicks);
     }
 
     private void applyPassives() {
