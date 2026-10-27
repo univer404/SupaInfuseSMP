@@ -1399,8 +1399,16 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FLY_INTO_WALL && Arrays.asList(active).contains("feather")) event.setCancelled(true);
         if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.DROWNING && Arrays.asList(active).contains("ocean")) event.setCancelled(true);
         if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL && Arrays.asList(active).contains("fire")) {
-            for (org.bukkit.block.Block block : player.getLocation().getNearbyBlocks(1, 1, 1)) {
-                if (block.getType() == Material.LAVA) { event.setCancelled(true); break; }
+            org.bukkit.Location location = player.getLocation();
+            for (int x = -1; x <= 1 && !event.isCancelled(); x++) {
+                for (int y = -1; y <= 1 && !event.isCancelled(); y++) {
+                    for (int z = -1; z <= 1; z++) {
+                        if (location.getWorld().getBlockAt(location.getBlockX() + x, location.getBlockY() + y, location.getBlockZ() + z).getType() == Material.LAVA) {
+                            event.setCancelled(true);
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
