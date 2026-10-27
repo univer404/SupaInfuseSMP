@@ -780,6 +780,14 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     private void activateInvisibility(Player player, int durationTicks) {
         invisiblePlayers.add(player.getUniqueId());
+        player.setCollidable(false);
+        player.getWorld().spawnParticle(org.bukkit.Particle.SQUID_INK, player.getLocation().add(0, 1, 0), 80, 2.0, 1.0, 2.0, 0.02);
+        for (org.bukkit.entity.Entity entity : player.getNearbyEntities(8, 5, 8)) {
+            if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(player)) continue;
+            if (entity instanceof Player target && trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+            living.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, durationTicks, 0, true, false, true));
+            living.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, durationTicks, 0, true, false, true));
+        }
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             if (viewer.equals(player) || trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(viewer.getUniqueId())) {
                 viewer.showPlayer(this, player);
@@ -790,6 +798,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, durationTicks, 0, true, false, true));
         Bukkit.getScheduler().runTaskLater(this, () -> {
             invisiblePlayers.remove(player.getUniqueId());
+            if (!Arrays.asList(slots(player.getUniqueId())).contains("invisibility")) player.setCollidable(true);
             for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
         }, durationTicks);
     }
@@ -829,12 +838,14 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             }
             if (active.contains("invisibility")) {
                 invisiblePlayers.add(player.getUniqueId());
+                player.setCollidable(false);
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, true, false, true));
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
                     if (viewer.equals(player) || trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(viewer.getUniqueId())) viewer.showPlayer(this, player);
                     else viewer.hidePlayer(this, player);
                 }
             } else if (invisiblePlayers.remove(player.getUniqueId())) {
+                player.setCollidable(true);
                 for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
             }
             if (active.contains("ender")) {
@@ -862,6 +873,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         isAugmented[0] = false; isAugmented[1] = false;
         saveData();
         invisiblePlayers.remove(id);
+        victim.setCollidable(true);
         for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, victim);
         var maxHealth = victim.getAttribute(Attribute.MAX_HEALTH);
         if (maxHealth != null) maxHealth.setBaseValue(20.0);
@@ -884,6 +896,20 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             event.setCancelled(true);
         }
     }
+    @EventHandler
+    public void invisibilityMobTarget(org.bukkit.event.entity.EntityTargetLivingEntityEvent event) {
+        if (!(event.getTarget() instanceof Player target) || disabled(target)) return;
+        if (Arrays.asList(slots(target.getUniqueId())).contains("invisibility")) event.setCancelled(true);
+    }
+
+    @EventHandler
+    public void invisibilityPotionImmunity(org.bukkit.event.entity.EntityPotionEffectEvent event) {
+        if (!(event.getEntity() instanceof Player player) || disabled(player) || event.getNewEffect() == null) return;
+        if (!Arrays.asList(slots(player.getUniqueId())).contains("invisibility")) return;
+        PotionEffectType type = event.getNewEffect().getType();
+        if (type == PotionEffectType.WITHER || type == PotionEffectType.DARKNESS) event.setCancelled(true);
+    }
+
     @EventHandler public void damage(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player attacker) || disabled(attacker)) return;
         if (!(event.getEntity() instanceof org.bukkit.entity.LivingEntity target)) return;
