@@ -46,6 +46,10 @@ commands:
     description: Read and update Infuse configuration values.
     usage: /conf <get|set|list> ...
     permission: infuse.admin
+  mapregion:
+    description: Disable Infuse inside selected WorldGuard regions.
+    usage: /mapregion <add|delete|list|clear> [region-id]
+    permission: infuse.admin
   toggledisplay:
     description: Toggle the Infuse HUD.
     usage: /toggledisplay
