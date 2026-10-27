@@ -1,6 +1,6 @@
 name: Infuse
 version: 1.0.0
-main: net.infuse.plugin.InfusePlugin
+main: com.catadmirer.infuseSMP.Infuse
 api-version: '1.21'
 authors: [SupaInfuseSMP]
 description: Java implementation of the Infuse effects system.
