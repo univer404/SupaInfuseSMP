@@ -2,7 +2,7 @@ name: Infuse
 version: 1.0.0
 main: com.supainfuse.smp.Infuse
 api-version: '1.21'
-authors: [SupaInfuseSMP]
+authors: [universe404]
 description: Java implementation of the Infuse effects system.
 softdepend: [PlaceholderAPI, WorldGuard, Geyser-Spigot, floodgate]
 commands:
