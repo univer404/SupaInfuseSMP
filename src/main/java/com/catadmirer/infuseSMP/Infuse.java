@@ -55,7 +55,6 @@ public final class Infuse extends JavaPlugin {
     private final Map<String, Integer> hitCounters = new HashMap<>();
     private final Map<String, Integer> hitPairs = new HashMap<>();
     private final Map<UUID, Deque<DamageSample>> recentDamage = new HashMap<>();
-    private final Set<UUID> xpTransferBypass = new HashSet<>();
     private final Map<UUID, Integer> hasteStacks = new HashMap<>();
     private final Map<UUID, org.bukkit.attribute.AttributeModifier> hasteModifiers = new HashMap<>();
     private final Map<UUID, org.bukkit.scheduler.BukkitTask> hasteResetTasks = new HashMap<>();
@@ -846,19 +845,12 @@ public final class Infuse extends JavaPlugin {
     private void transferExperience(Player from, Player to, int amount) {
         if (amount <= 0) return;
         UUID fromId = from.getUniqueId(), toId = to.getUniqueId();
-        xpTransferBypass.add(fromId);
         from.giveExp(-amount);
-        xpTransferBypass.add(toId);
         to.giveExp(amount);
-        Bukkit.getScheduler().runTaskLater(this, () -> {
-            xpTransferBypass.remove(fromId);
-            xpTransferBypass.remove(toId);
-        }, 1L);
     }
 
     @EventHandler
     public void onExperienceGain(org.bukkit.event.player.PlayerExpChangeEvent event) {
-        if (xpTransferBypass.remove(event.getPlayer().getUniqueId())) return;
         if (disabled(event.getPlayer())) return;
         String[] activeSlots = slots(event.getPlayer().getUniqueId());
         if (!Arrays.asList(activeSlots).contains("emerald")) return;
@@ -1544,9 +1536,13 @@ public final class Infuse extends JavaPlugin {
             int hitsAgainstVictim = hitPairs.merge(pairKey, 1, Integer::sum);
             if (Arrays.asList(slots(victim.getUniqueId())).contains("emerald") &&
                     hitsAgainstVictim % Math.max(1, getConfig().getInt("effects.emerald.trigger-hits", 10)) == 0) {
-                int cooldownTicks = getConfig().getInt("effects.emerald.hit-item-cooldown-ticks", 100);
-                attacker.setCooldown(Material.POTION, cooldownTicks);
-                attacker.setCooldown(Material.EXPERIENCE_BOTTLE, cooldownTicks);
+                int cooldownTicks = Math.max(0, getConfig().getInt("effects.emerald.hit-item-cooldown-ticks", 200));
+                for (Material material : Material.values()) {
+                    if (material.isEdible() || material == Material.POTION || material == Material.SPLASH_POTION ||
+                            material == Material.LINGERING_POTION || material == Material.EXPERIENCE_BOTTLE) {
+                        attacker.setCooldown(material, cooldownTicks);
+                    }
+                }
             }
         }
         if (trustedTarget) return;
@@ -1560,14 +1556,14 @@ public final class Infuse extends JavaPlugin {
             applySpeedStack(speedVictim, getConfig().getDouble("effects.speed.hit-decrease", -0.1));
         }
         if (active.contains("strength")) {
-            double multiplier = target instanceof Player ? 1.2 : getConfig().getDouble("effects.strength.mob-damage-multiplier", 2.0);
+            if (!(target instanceof Player)) event.setDamage(event.getDamage() * getConfig().getDouble("effects.strength.mob-damage-multiplier", 2.0));
             double lostHealth = Math.max(0, attacker.getMaxHealth() - attacker.getHealth());
-            event.setDamage(event.getDamage() * multiplier + lostHealth * getConfig().getDouble("effects.strength.hp-loss-atk-bonus", 0.05));
+            event.setDamage(event.getDamage() + lostHealth * getConfig().getDouble("effects.strength.hp-loss-attack-bonus", 0.3));
             boolean sparkActive = sparkEnds.getOrDefault(attacker.getUniqueId() + ":strength", 0L) > System.currentTimeMillis();
             if (sparkActive) {
                 boolean critical = attacker.getFallDistance() > 0 && !attacker.isOnGround() && !attacker.isSprinting() &&
                         !attacker.isInWater() && !attacker.hasPotionEffect(PotionEffectType.SLOW_FALLING);
-                event.setDamage(event.getDamage() * (critical ? getConfig().getDouble("effects.strength.double-crit-mult", 2.0) : 1.5));
+                event.setDamage(event.getDamage() * (critical ? getConfig().getDouble("effects.strength.double-crit-multiplier", 1.334) : 1.5));
                 attacker.getWorld().spawnParticle(critical ? org.bukkit.Particle.END_ROD : org.bukkit.Particle.CRIT,
                         target.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.2);
                 if (!critical) attacker.playSound(attacker.getLocation(), "entity.player.attack.crit", 1.0f, 1.0f);
@@ -1643,9 +1639,6 @@ public final class Infuse extends JavaPlugin {
                 windCharges.merge(victim.getUniqueId(), 1, Integer::sum);
                 victim.playSound(victim.getLocation(), "entity.wind_charge.wind_burst", 0.6f, 1.4f);
             }
-        }
-        if (active.contains("emerald") && target instanceof Player) {
-            attacker.giveExp(Math.max(0, getConfig().getInt("effects.emerald.xp-steal-amount", 2)));
         }
     }
 
