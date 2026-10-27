@@ -1093,6 +1093,23 @@ public final class Infuse extends JavaPlugin {
     private void spark(Player p) {
         spark(p, "primary");
     }
+    private int cooldownDivisor(UUID playerId, String effect) {
+        String[] current = slots(playerId);
+        boolean[] isAugmented = augmented.getOrDefault(playerId, new boolean[]{false, false});
+        int points = 0;
+        for (int slot = 0; slot < current.length; slot++) {
+            if (!effect.equals(current[slot])) continue;
+            points++;
+            if (isAugmented[slot]) points++;
+        }
+        return switch (points) {
+            case 2 -> 2;
+            case 3 -> 3;
+            case 4 -> 4;
+            default -> 1;
+        };
+    }
+
     private void spark(Player p, String requestedSlot) {
         String[] s=slots(p.getUniqueId());
         String effect = requestedSlot == null ? (!s[1].isBlank()?s[1]:s[0]) : s[requestedSlot.equalsIgnoreCase("secondary") ? 1 : 0];
@@ -1110,7 +1127,8 @@ public final class Infuse extends JavaPlugin {
             p.sendMessage(mini.deserialize("<red>That Spark is on cooldown for " + ((cooldownUntil - now + 999) / 1000) + "s."));
             return;
         }
-        long cooldownSeconds = Math.max(0, getConfig().getLong("effects." + effect + ".cooldown-seconds", 60));
+        long baseCooldownSeconds = Math.max(0, getConfig().getLong("effects." + effect + ".cooldown-seconds", 60));
+        long cooldownSeconds = baseCooldownSeconds / cooldownDivisor(p.getUniqueId(), effect);
         int durationTicks = (int) Math.max(1, getConfig().getLong("effects." + effect + ".spark-seconds", 15) * 20L);
         cooldowns.remove(key);
         sparkEnds.put(key, now + durationTicks * 50L);
