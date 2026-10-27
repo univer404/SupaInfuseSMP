@@ -1,0 +1,22 @@
+name: Infuse
+version: 1.0.0
+main: net.infuse.plugin.InfusePlugin
+api-version: '1.21'
+authors: [SupaInfuseSMP]
+description: Java implementation of the Infuse effects system.
+softdepend: [PlaceholderAPI, WorldGuard, Geyser-Spigot, floodgate]
+commands:
+  infuse:
+    description: Open Infuse and manage equipped effects.
+    usage: /infuse [gui|give|reload|trust]
+    aliases: [infuses]
+  trust:
+    description: Manage players trusted by your Infuse effects.
+    usage: /trust <add|remove|list|clear> [player]
+permissions:
+  infuse.admin:
+    description: Manage Infuse settings and items.
+    default: op
+  infuse.use:
+    description: Use Infuse features.
+    default: true
