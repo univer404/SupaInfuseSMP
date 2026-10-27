@@ -1136,8 +1136,10 @@ public final class Infuse extends JavaPlugin {
         int interval = Math.max(1, getConfig().getInt("effects.ocean.pull-interval-ticks", 2));
         double radius = Math.max(0.1, getConfig().getDouble("effects.ocean.pull-radius", 6.0));
         double strength = Math.max(0.0, getConfig().getDouble("effects.ocean.pull-strength", 0.1));
+        final int[] elapsed = {0};
         Bukkit.getScheduler().runTaskTimer(this, task -> {
-            if (!caster.isOnline() || disabled(caster)) { task.cancel(); return; }
+            if (!caster.isOnline() || disabled(caster) || elapsed[0] >= iterations) { task.cancel(); return; }
+            elapsed[0]++;
             for (Player target : caster.getWorld().getPlayers()) {
                 if (target.equals(caster) || disabled(target) || trustManager.isTrusted(caster.getUniqueId(), target.getUniqueId())) continue;
                 if (target.getLocation().distanceSquared(caster.getLocation()) > radius * radius) continue;
@@ -1148,7 +1150,7 @@ public final class Infuse extends JavaPlugin {
             if (caster.getLocation().getBlock().isLiquid()) caster.setRemainingAir(caster.getMaximumAir());
             caster.getWorld().spawnParticle(org.bukkit.Particle.BUBBLE_COLUMN_UP,
                     caster.getLocation().add(0, 0.5, 0), 6, radius * 0.25, 0.4, radius * 0.25, 0.02);
-            task.cancel();
+            if (elapsed[0] >= iterations) task.cancel();
         }, 0L, interval);
     }
 
