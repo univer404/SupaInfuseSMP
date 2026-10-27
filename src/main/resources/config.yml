@@ -97,6 +97,10 @@ effects:
     augment-limit: 0
     attack-speed-stack: 0.2
     iframe-duration: 19
+    break-speed-multiplier: 1.5
+    decay-amount: -0.1
+    spark-atkspd-increase: 0.5
+    spark-break-speed-multiplier: 1024.0
   heart:
     color: "#FC0046"
     cooldown-seconds: 120
