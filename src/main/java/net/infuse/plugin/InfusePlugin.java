@@ -375,7 +375,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             if (attacker.getWorld().hasStorm() && attacker.getWorld().isThundering()) threshold = Math.max(1, threshold / 2);
             if (countHit(attacker, "thunder") % threshold == 0) {
                 attacker.getWorld().strikeLightningEffect(target.getLocation());
-                if (getConfig().getBoolean("settings.allow-true-damage", true)) target.damage(getConfig().getDouble("effects.thunder.true-damage", 1.0), attacker);
+                if (getConfig().getBoolean("settings.allow-true-damage", true)) event.setDamage(event.getDamage() + getConfig().getDouble("effects.thunder.true-damage", 1.0));
             }
         }
         if (active.contains("frost") && countHit(attacker, "frost") % getConfig().getInt("effects.frost.trigger-hits", 10) == 0) {
