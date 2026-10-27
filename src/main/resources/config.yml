@@ -17,9 +17,9 @@ settings:
   recharge-sound: "custom.health"
   resource-pack:
     enabled: true
-    url: "https://github.com/univer404/SupaInfuseSMP/releases/download/tpack-1.21.11/Infuse-Texture-Pack-1.21.11.zip"
+    url: "https://github.com/univer404/SupaInfuseSMP/releases/download/tpack-26.3/Infuse-Texture-Pack-26.3.zip"
     sha1: "c84941d094d95ca1c5f3429989aa8b26f377ce16"
-    prompt: "Infuse includes custom textures. Download the official resource pack to see them."
+    prompt: "Infuse includes custom textures. Download the official Minecraft 26.3 resource pack to see them."
 effects:
   emerald:
     color: "#0DFC00"
