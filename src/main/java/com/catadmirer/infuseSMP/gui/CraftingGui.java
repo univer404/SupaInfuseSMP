@@ -1,6 +1,6 @@
-package com.catadmirer.infuseSMP.gui;
+package com.supainfuse.smp.gui;
 
-import com.catadmirer.infuseSMP.Infuse;
+import com.supainfuse.smp.Infuse;
 
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
