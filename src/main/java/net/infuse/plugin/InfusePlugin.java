@@ -124,6 +124,40 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
             reloadConfig(); saveDefaultConfig(); sender.sendMessage(mini.deserialize(message("reload"))); return true;
         }
+        if (args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("remove") || args[0].equalsIgnoreCase("get")) {
+            if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
+            if (args.length < 2) { sender.sendMessage("/infuse <add|remove|get> <player> [effect] [primary|secondary|augmented]"); return true; }
+            Player target = Bukkit.getPlayerExact(args[1]);
+            if (target == null) { tell(sender, "not-player"); return true; }
+            String[] targetSlots = slots(target.getUniqueId());
+            if (args[0].equalsIgnoreCase("get")) {
+                sender.sendMessage(mini.deserialize("<yellow>" + target.getName() + " <gray>Primary: <white>" + display(targetSlots[0]) + " <gray>| Secondary: <white>" + display(targetSlots[1])));
+                return true;
+            }
+            if (args[0].equalsIgnoreCase("remove")) {
+                String slot = args.length > 2 ? args[2].toLowerCase(Locale.ROOT) : "both";
+                if (slot.equals("both")) { targetSlots[0] = ""; targetSlots[1] = ""; }
+                else if (slot.equals("primary") || slot.equals("p")) targetSlots[0] = "";
+                else if (slot.equals("secondary") || slot.equals("s")) targetSlots[1] = "";
+                else { sender.sendMessage("Slot must be primary, secondary, or both."); return true; }
+                saveData(); sender.sendMessage(mini.deserialize("<yellow>Removed Infuse effect from " + target.getName() + ".")); return true;
+            }
+            if (args.length < 3) { sender.sendMessage("/infuse add <player> <effect> [primary|secondary|both] [augmented]"); return true; }
+            String effect = clean(args[2]);
+            if (!EFFECTS.contains(effect)) { tell(sender, "unknown-effect"); return true; }
+            String slot = args.length > 3 ? args[3].toLowerCase(Locale.ROOT) : "both";
+            if (slot.equals("both")) { targetSlots[0] = effect; targetSlots[1] = effect; }
+            else if (slot.equals("primary") || slot.equals("p")) targetSlots[0] = effect;
+            else if (slot.equals("secondary") || slot.equals("s")) targetSlots[1] = effect;
+            else { sender.sendMessage("Slot must be primary, secondary, or both."); return true; }
+            if (!getConfig().getBoolean("settings.allow-same-effects", false) && !targetSlots[0].isBlank() && targetSlots[0].equals(targetSlots[1]) && !slot.equals("both")) {
+                sender.sendMessage(mini.deserialize("<red>The same effect cannot be equipped in both slots."));
+                return true;
+            }
+            saveData();
+            sender.sendMessage(mini.deserialize("<green>Applied " + title(effect) + " to " + target.getName() + "."));
+            return true;
+        }
         if (args[0].equalsIgnoreCase("give")) {
             if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
             if (args.length < 3) { sender.sendMessage("/infuse give <player> <effect> [augmented]"); return true; }
