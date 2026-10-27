@@ -1732,6 +1732,20 @@ public final class Infuse extends JavaPlugin {
         invisiblePlayers.remove(id);
         windCharges.remove(id);
         windChargeCooldowns.remove(id);
+        enderCurses.remove(id);
+        enderSparkCooldownReset.remove(id);
+        regenFoodWindow.remove(id);
+        recentDamage.remove(id);
+        oceanAir.remove(id);
+        oceanLastActive.remove(id);
+        fireGlidingPlayers.remove(id);
+        clearHasteStack(victim);
+        clearSpeedStack(victim);
+        updateFrostModifiers(victim, false);
+        cooldowns.keySet().removeIf(key -> key.startsWith(id + ":"));
+        sparkEnds.keySet().removeIf(key -> key.startsWith(id + ":"));
+        hitCounters.keySet().removeIf(key -> key.startsWith(id + ":"));
+        hitPairs.keySet().removeIf(key -> key.startsWith(id + ":") || key.endsWith(":" + id));
         victim.setCollidable(true);
         for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, victim);
         var maxHealth = victim.getAttribute(Attribute.MAX_HEALTH);
@@ -2041,6 +2055,13 @@ public final class Infuse extends JavaPlugin {
         oceanAir.remove(player.getUniqueId());
         oceanLastActive.remove(player.getUniqueId());
         recentDamage.remove(player.getUniqueId());
+        windChargeCooldowns.remove(player.getUniqueId());
+        enderCurses.remove(player.getUniqueId());
+        regenFoodWindow.remove(player.getUniqueId());
+        cooldowns.keySet().removeIf(key -> key.startsWith(player.getUniqueId() + ":"));
+        sparkEnds.keySet().removeIf(key -> key.startsWith(player.getUniqueId() + ":"));
+        hitCounters.keySet().removeIf(key -> key.startsWith(player.getUniqueId() + ":"));
+        hitPairs.keySet().removeIf(key -> key.startsWith(player.getUniqueId() + ":") || key.endsWith(":" + player.getUniqueId()));
     }
 
     private void clearSpeedStack(Player player) {
