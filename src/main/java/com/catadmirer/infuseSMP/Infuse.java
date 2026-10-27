@@ -1,6 +1,7 @@
 package com.catadmirer.infuseSMP;
 
 import com.catadmirer.infuseSMP.effects.EffectRegistry;
+import com.catadmirer.infuseSMP.managers.MessageManager;
 import com.catadmirer.infuseSMP.gui.CraftingGui;
 import com.catadmirer.infuseSMP.gui.InfuseGui;
 import com.catadmirer.infuseSMP.gui.RecipeBookGui;
@@ -66,6 +67,7 @@ public final class Infuse extends JavaPlugin {
     private final Set<UUID> fireGlidingPlayers = new HashSet<>();
     private final Map<UUID, Integer> windCharges = new HashMap<>();
     private NamespacedKey effectKey;
+    private MessageManager messageManager;
     private InfuseGui gui;
     private RecipeBookGui recipeGui;
     private WorldGuardRegionManager regionManager;
@@ -76,6 +78,7 @@ public final class Infuse extends JavaPlugin {
         saveResource("gui.yml", false);
         saveResource("messages.yml", false);
         effectKey = new NamespacedKey(this, "effect");
+        messageManager = new MessageManager(this, mini);
         gui = new InfuseGui(this);
         recipeGui = new RecipeBookGui(this);
         if (Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) regionManager = new WorldGuardRegionManager(this);
@@ -160,8 +163,7 @@ public final class Infuse extends JavaPlugin {
     public net.kyori.adventure.text.minimessage.MiniMessage getMiniMessage() { return mini; }
 
     private String message(String key) {
-        var cfg = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.File(getDataFolder(), "messages.yml"));
-        return cfg.getString("prefix", "<#A855F7>Infuse » ") + cfg.getString(key, "<red>Missing message: " + key);
+        return messageManager.get(key);
     }
     private void tell(CommandSender sender, String key) { sender.sendMessage(mini.deserialize(message(key))); }
     private String clean(String s) { return s == null ? "" : s.toLowerCase(Locale.ROOT); }
@@ -212,7 +214,7 @@ public final class Infuse extends JavaPlugin {
         }
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
-            reloadConfig(); saveDefaultConfig(); gui.reload(); recipeGui.reload(); sender.sendMessage(mini.deserialize(message("reload"))); return true;
+            reloadConfig(); saveDefaultConfig(); gui.reload(); recipeGui.reload(); messageManager.reload(); sender.sendMessage(mini.deserialize(message("reload"))); return true;
         }
         if (args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("remove") || args[0].equalsIgnoreCase("get") || args[0].equalsIgnoreCase("history")) {
             return adminInfuseCommand(sender, args);
