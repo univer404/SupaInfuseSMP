@@ -1,4 +1,4 @@
-package com.catadmirer.infuseSMP.util.trust;
+package com.supainfuse.smp.util.trust;
 
 import java.util.Collection;
 import java.util.HashMap;
