@@ -143,4 +143,5 @@ effects:
 
 
 crafting:
+  augmented-ritual-seconds: 600
   crafted: {}
