@@ -211,7 +211,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         isAugmented[index] = false;
         addHistory(player.getUniqueId(), index, "none", false);
         saveData();
-        player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOTTLE_FILL, 0.5f, 0.8f);
+        player.playSound(player.getLocation(), "item.bottle.fill", 0.5f, 0.8f);
         player.sendMessage(mini.deserialize("<yellow>Drained <white>" + title(effect) + "<yellow> from your " + slot + " slot."));
         return true;
     }
@@ -565,7 +565,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         addHistory(player.getUniqueId(), target, effect, isAugmented);
         saveData();
         player.sendMessage(mini.deserialize("<green>Applied <white>" + (isAugmented ? "Augmented " : "") + title(effect) + "<green> to your " + (target == 0 ? "primary" : "secondary") + " slot."));
-        player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1.0f, target == 0 ? 1.1f : 1.4f);
+        player.playSound(player.getLocation(), "block.enchantment_table.use", 1.0f, target == 0 ? 1.1f : 1.4f);
         return true;
     }
 
