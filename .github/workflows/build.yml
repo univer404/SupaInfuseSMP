@@ -83,7 +83,7 @@ jobs:
               for info in source.infolist():
                   data = source.read(info.filename)
                   if info.filename == "pack.mcmeta":
-                      data = (json.dumps(metadata, ensure_ascii=False, indent=2) + "\\n").encode("utf-8")
+                      data = (json.dumps(metadata, ensure_ascii=False, indent=2)).encode("utf-8")
                   target.writestr(info, data)
           result = output.getvalue()
           with zipfile.ZipFile(io.BytesIO(result)) as check:
