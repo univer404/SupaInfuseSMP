@@ -295,9 +295,25 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             ItemStack clicked=e.getCurrentItem(); if(clicked==null) return;
             String encoded=clicked.getItemMeta().getPersistentDataContainer().get(effectKey,PersistentDataType.STRING);
             if(encoded==null) return;
-            String effect=encoded.split(":")[0]; String[] slots=slots(p.getUniqueId());
+            String effect=encoded.split(":")[0]; String[] current=slots(p.getUniqueId());
             int target = selectionMode.getOrDefault(p.getUniqueId(), 0);
-            slots[target]=effect;
+            if (!getConfig().getBoolean("settings.allow-same-effects", false) && effect.equals(current[1 - target])) {
+                p.sendMessage(mini.deserialize("<red>You cannot equip the same effect in both slots."));
+                return;
+            }
+            if (getConfig().getBoolean("settings.lock-effects", false)) {
+                List<String> primaryOnly = getConfig().getStringList("settings.primary-effects");
+                List<String> secondaryOnly = getConfig().getStringList("settings.secondary-effects");
+                if (target == 0 && secondaryOnly.contains(effect) && !primaryOnly.contains(effect)) {
+                    p.sendMessage(mini.deserialize("<red>That effect is locked to the secondary slot."));
+                    return;
+                }
+                if (target == 1 && primaryOnly.contains(effect) && !secondaryOnly.contains(effect)) {
+                    p.sendMessage(mini.deserialize("<red>That effect is locked to the primary slot."));
+                    return;
+                }
+            }
+            current[target]=effect;
             saveData(); p.sendMessage(mini.deserialize("<green>Equipped <white>"+title(effect)+"<green> in "+(target==0?"primary":"secondary")+" slot."));
             openMain(p);
         }
