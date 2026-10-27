@@ -37,7 +37,7 @@ final class InfuseRecipeBookGui implements Listener {
         List<Integer> slots = gui.getIntegerList("recipes.slots");
         for (int i = 0; i < EFFECTS.size() && i < slots.size(); i++) {
             int slot = slots.get(i);
-            if (valid(inventory, slot)) inventory.setItem(slot, plugin.createEffectItem(EFFECTS.get(i), false));
+            if (valid(inventory, slot)) inventory.setItem(slot, plugin.createEffectItem(EFFECTS.get(i), EFFECTS.get(i).equals("earth") || EFFECTS.get(i).equals("ender")));
         }
         finish(player, inventory, "main");
     }
@@ -50,7 +50,7 @@ final class InfuseRecipeBookGui implements Listener {
                 Material material = Material.matchMaterial(recipe.get(i));
                 if (material != null) inventory.setItem(RECIPE_SLOTS[i], new ItemStack(material));
             }
-            set(inventory, gui.getInt("recipes.result-slot", 24), plugin.createEffectItem(effect, false));
+            set(inventory, gui.getInt("recipes.result-slot", 24), plugin.createEffectItem(effect, effect.equals("earth") || effect.equals("ender")));
         }
         set(inventory, gui.getInt("recipes.back-slot", 36), plugin.named(Material.ARROW, "<gray><bold>← Back"));
         finish(player, inventory, effect);
