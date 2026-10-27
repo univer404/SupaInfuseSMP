@@ -1626,6 +1626,9 @@ public final class Infuse extends JavaPlugin {
             }
             Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
             active.remove("");
+            if (!active.contains("speed")) clearSpeedStack(player);
+            if (!active.contains("haste")) clearHasteStack(player);
+            if (!active.contains("feather")) windCharges.remove(player.getUniqueId());
             if (active.contains("speed")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
             if (active.contains("haste")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 0, true, false, true));
