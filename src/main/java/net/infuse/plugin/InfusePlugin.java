@@ -776,6 +776,17 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
     }
 
+    private void applyToolEnchant(ItemStack item, org.bukkit.enchantments.Enchantment enchantment, int level) {
+        if (item == null || item.getType() == Material.AIR) return;
+        boolean overwrite = getConfig().getBoolean("settings.overwrite-enchants", true);
+        if (!overwrite && item.containsEnchantment(enchantment)) return;
+        if (item.getType().name().endsWith("_SWORD") || item.getType().name().endsWith("_AXE") ||
+                item.getType().name().endsWith("_PICKAXE") || item.getType().name().endsWith("_SHOVEL") ||
+                item.getType().name().endsWith("_HOE") || item.getType() == Material.SHEARS) {
+            item.addUnsafeEnchantment(enchantment, level);
+        }
+    }
+
     private void healTrustedNearby(Player caster, double radius, double percentage) {
         double amount = Math.max(1.0, caster.getMaxHealth() * percentage);
         caster.setHealth(Math.min(caster.getMaxHealth(), caster.getHealth() + amount));
@@ -830,11 +841,18 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
             active.remove("");
             if (active.contains("speed")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
-            if (active.contains("haste")) player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 0, true, false, true));
+            if (active.contains("haste")) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 0, true, false, true));
+                applyToolEnchant(player.getInventory().getItemInMainHand(), org.bukkit.enchantments.Enchantment.LOOT_BONUS_BLOCKS, 5);
+                applyToolEnchant(player.getInventory().getItemInMainHand(), org.bukkit.enchantments.Enchantment.DURABILITY, 10);
+            }
             if (active.contains("strength")) player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 40, 0, true, false, true));
             if (active.contains("regeneration")) player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 0, true, false, true));
             if (active.contains("fire")) player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 40, 0, true, false, true));
-            if (active.contains("emerald")) player.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, 40, 2, true, false, true));
+            if (active.contains("emerald")) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, 40, 2, true, false, true));
+                applyToolEnchant(player.getInventory().getItemInMainHand(), org.bukkit.enchantments.Enchantment.LOOT_BONUS_MOBS, 5);
+            }
             if (active.contains("ocean")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, 40, 0, true, false, true));
                 if (player.isInWater()) player.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, 40, 0, true, false, true));
