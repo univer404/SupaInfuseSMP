@@ -1792,6 +1792,7 @@ public final class Infuse extends JavaPlugin {
         invisiblePlayers.remove(id);
         windCharges.remove(id);
         windChargeCooldowns.remove(id);
+        stopInvisibilitySpark(victim);
         enderCurses.remove(id);
         enderSparkCooldownReset.remove(id);
         regenFoodWindow.remove(id);
@@ -2108,6 +2109,7 @@ public final class Infuse extends JavaPlugin {
     @EventHandler
     public void quit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        stopInvisibilitySpark(player);
         clearHasteStack(player);
         clearSpeedStack(player);
         updateFrostModifiers(player, false);
