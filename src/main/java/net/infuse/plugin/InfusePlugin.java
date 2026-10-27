@@ -40,6 +40,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> hitCounters = new HashMap<>();
+    private final Map<String, Integer> hitPairs = new HashMap<>();
+    private final Set<UUID> xpTransferBypass = new HashSet<>();
     private final Map<String, Long> sparkEnds = new HashMap<>();
     private final Map<UUID, Long> trustActionCooldowns = new HashMap<>();
     private final Set<UUID> invisiblePlayers = new HashSet<>();
@@ -758,8 +760,22 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         equipEffect(player, parts[0], parts.length > 1 && parts[1].equalsIgnoreCase("augmented"), true);
     }
 
+    private void transferExperience(Player from, Player to, int amount) {
+        if (amount <= 0) return;
+        UUID fromId = from.getUniqueId(), toId = to.getUniqueId();
+        xpTransferBypass.add(fromId);
+        from.giveExp(-amount);
+        xpTransferBypass.add(toId);
+        to.giveExp(amount);
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            xpTransferBypass.remove(fromId);
+            xpTransferBypass.remove(toId);
+        }, 1L);
+    }
+
     @EventHandler
     public void onExperienceGain(org.bukkit.event.player.PlayerExpChangeEvent event) {
+        if (xpTransferBypass.remove(event.getPlayer().getUniqueId())) return;
         if (disabled(event.getPlayer())) return;
         String[] activeSlots = slots(event.getPlayer().getUniqueId());
         if (!Arrays.asList(activeSlots).contains("emerald")) return;
@@ -1402,10 +1418,40 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     @EventHandler public void damage(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player attacker) || disabled(attacker)) return;
         if (!(event.getEntity() instanceof org.bukkit.entity.LivingEntity target)) return;
-        if (target instanceof Player victim && trusted.getOrDefault(attacker.getUniqueId(), Set.of()).contains(victim.getUniqueId())) return;
+        boolean trustedTarget = target instanceof Player victim && trusted.getOrDefault(attacker.getUniqueId(), Set.of()).contains(victim.getUniqueId());
         String[] activeSlots = slots(attacker.getUniqueId());
         Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
         active.remove("");
+        if (target instanceof Player victim) {
+            if (active.contains("emerald")) {
+                if (trustedTarget) {
+                    event.setCancelled(true);
+                    transferExperience(attacker, victim, getConfig().getInt("effects.emerald.xp-share-amount", 1));
+                } else {
+                    transferExperience(victim, attacker, getConfig().getInt("effects.emerald.xp-steal-amount", 2));
+                }
+            }
+            if (active.contains("heart") && trustedTarget) {
+                double transferHealth = Math.min(attacker.getHealth() - 10.0, 10.0);
+                if (transferHealth > 0) {
+                    event.setCancelled(true);
+                    int amplifier = Math.max(0, (int) (transferHealth / 2.0));
+                    int duration = Math.max(1, (int) (480.0 / transferHealth * 20.0));
+                    victim.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, duration, amplifier, true, true, true));
+                    attacker.setHealth(Math.min(attacker.getMaxHealth(), getConfig().getDouble("effects.heart.return-after-hit", 10.0)));
+                    attacker.playSound(attacker.getLocation(), "entity.player.levelup", 1.0f, 1.2f);
+                }
+            }
+            String pairKey = victim.getUniqueId() + ":" + attacker.getUniqueId();
+            int hitsAgainstVictim = hitPairs.merge(pairKey, 1, Integer::sum);
+            if (Arrays.asList(slots(victim.getUniqueId())).contains("emerald") &&
+                    hitsAgainstVictim % Math.max(1, getConfig().getInt("effects.emerald.trigger-hits", 10)) == 0) {
+                int cooldownTicks = getConfig().getInt("effects.emerald.hit-item-cooldown-ticks", 100);
+                attacker.setCooldown(Material.POTION, cooldownTicks);
+                attacker.setCooldown(Material.EXPERIENCE_BOTTLE, cooldownTicks);
+            }
+        }
+        if (trustedTarget) return;
         if (active.contains("strength")) {
             double multiplier = target instanceof Player ? 1.2 : getConfig().getDouble("effects.strength.mob-damage-multiplier", 2.0);
             if (sparkEnds.getOrDefault(attacker.getUniqueId() + ":strength", 0L) > System.currentTimeMillis()) multiplier *= 1.5;
