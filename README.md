@@ -10,7 +10,7 @@ Requires JDK 21 and Maven:
 mvn --batch-mode clean package
 ```
 
-The JAR is written to `target/Infuse.jar`. GitHub Actions builds the branch and publishes a downloadable workflow artifact.
+The JAR is written to `target/Infuse.jar`. GitHub Actions builds the branch and publishes a downloadable workflow artifact. The build also validates the configured resource-pack HTTPS URL, SHA-1, ZIP integrity, and `pack.mcmeta` so broken or changed hosting is caught by CI.
 
 ## Install
 
@@ -18,9 +18,11 @@ The JAR is written to `target/Infuse.jar`. GitHub Actions builds the branch and 
 2. Put `Infuse.jar` in the server's `plugins` folder.
 3. Start the server once so the plugin creates its configuration files.
 4. Review `plugins/Infuse/config.yml`, `gui.yml`, and `messages.yml`.
-5. Restart the server after changing settings that affect recipes or resource packs.
+5. Keep `settings.resource-pack.enabled` enabled to prompt players to download the custom pack. The configured URL and SHA-1 must always match the exact ZIP being hosted.
 
-The original texture pack is currently hosted externally. The configured URL and SHA-1 are in `settings.resource-pack`; they are not bundled in this repository yet.
+## Texture pack
+
+The original supplied pack is configured at the HTTPS URL in `src/main/resources/config.yml`; its expected SHA-1 is `2a4079e2f08424192e4ee8b8d3df26d1f386cd15`. The pack contains custom effect glyphs, potion/wind-charge item models, textures, and four custom sounds. The build validates the currently configured hosted ZIP, but the binary pack itself is still hosted by the original upstream repository rather than copied into this repository. The pack's original `pack.mcmeta` declares legacy `pack_format: 64`; this may show a compatibility warning on Minecraft 1.21.11 (resource-pack format 75). The metadata warning is distinct from whether the server can download the pack.
 
 ## Source layout
 
@@ -36,6 +38,9 @@ src/main/java/com/catadmirer/infuseSMP/
 │   └── SparkAbilityManager.java # Spark activation dispatch
 ├── expansions/
 │   └── InfusePlaceholders.java  # optional PlaceholderAPI expansion
+├── extraeffects/
+│   ├── AugmentationManager.java
+│   └── EmeraldEnchantingListener.java
 ├── gui/
 │   ├── InfuseGui.java           # main and effect-selection menus
 │   ├── RecipeBookGui.java       # recipe browser
@@ -92,6 +97,6 @@ Install WorldGuard to use `/mapregion`. Without it, the plugin still supports th
 
 ## Status
 
-The conversion now has dedicated command, listener, GUI, effect-registry, augmentation/enchanting, message, trust, region, and placeholder packages. It implements the main effect items, primary/secondary slots, Spark activation/cooldowns, controls, trust delays, death handling, configurable GUIs, recipe browsing/crafting, augmented rituals, region restrictions, and a subset of effect-specific passive/combat abilities.
+The conversion has dedicated command, listener, GUI, effect-registry, augmentation/enchanting, message, trust, region, and placeholder packages. It implements the main effect items, primary/secondary slots, Spark activation/cooldowns, controls, trust delays, death handling, configurable GUIs, recipe browsing/crafting, augmented rituals, region restrictions, and a subset of effect-specific passive/combat abilities.
 
 It remains an **in-progress conversion** rather than a verified feature-for-feature replacement. Some effect edge cases, original animation sequences, and SkBee-specific behavior still need parity testing. Use a test server first and do not treat it as production-equivalent until the remaining parity checks and live-server tests are complete.
