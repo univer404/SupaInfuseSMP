@@ -1,6 +1,6 @@
-package com.catadmirer.infuseSMP.gui;
+package com.supainfuse.smp.gui;
 
-import com.catadmirer.infuseSMP.Infuse;
+import com.supainfuse.smp.Infuse;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
