@@ -2,6 +2,7 @@ package com.catadmirer.infuseSMP;
 
 import com.catadmirer.infuseSMP.effects.EffectRegistry;
 import com.catadmirer.infuseSMP.extraeffects.AugmentationManager;
+import com.catadmirer.infuseSMP.extraeffects.EmeraldEnchantingListener;
 import com.catadmirer.infuseSMP.managers.MessageManager;
 import com.catadmirer.infuseSMP.util.trust.TrustManager;
 import com.catadmirer.infuseSMP.gui.CraftingGui;
@@ -117,6 +118,7 @@ public final class Infuse extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new EffectItemListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerLifecycleListener(this), this);
         getServer().getPluginManager().registerEvents(new SparkControlListener(this), this);
+        getServer().getPluginManager().registerEvents(new EmeraldEnchantingListener(this), this);
         getServer().getPluginManager().registerEvents(new CraftingGui(this), this);
         getServer().getPluginManager().registerEvents(recipeGui, this);
         passiveTask = Bukkit.getScheduler().runTaskTimer(this, this::applyPassives, 20L, 20L);
@@ -182,6 +184,10 @@ public final class Infuse extends JavaPlugin {
     }
     private void tell(CommandSender sender, String key) { sender.sendMessage(mini.deserialize(message(key))); }
     private String clean(String s) { return s == null ? "" : s.toLowerCase(Locale.ROOT); }
+    public boolean hasEffect(Player player, String effect) {
+        return player != null && !disabled(player) && Arrays.asList(slots(player.getUniqueId())).contains(effect);
+    }
+
     public String[] slots(UUID id) { return equipped.computeIfAbsent(id, ignored -> new String[]{"", ""}); }
     private boolean disabled(Player p) {
         if (getConfig().getStringList("settings.disabled-worlds").contains(p.getWorld().getName())) return true;
