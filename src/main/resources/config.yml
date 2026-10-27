@@ -26,6 +26,9 @@ effects:
     craft-limit: -1
     augment-limit: 0
     xp-gain-per-hit: 1
+    no-consume-chance: 0.5
+    spark-no-consume-chance: 0.75
+    spark-xp-gain: 2
   feather:
     color: "#BEA3CA"
     cooldown-seconds: 60
@@ -60,6 +63,10 @@ effects:
     spark-seconds: 60
     craft-limit: -1
     augment-limit: 0
+    food-absorption-tier: 0
+    egap-absorption-tier: 4
+    food-absorption-duration-ticks: 1200
+    spark-heal-percentage: 0.2
   invisibility:
     color: "#7E00FC"
     cooldown-seconds: 60
