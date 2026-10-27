@@ -836,7 +836,6 @@ public final class Infuse extends JavaPlugin {
         long duration = Math.max(1, getConfig().getLong("effects.ender.curse-duration-seconds", 15)) * 1000L;
         long expiresAt = System.currentTimeMillis() + duration;
         enderCurses.put(targetId, expiresAt);
-        target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, Math.max(20, (int) (duration / 50L)), 0, true, false, true));
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (enderCurses.getOrDefault(targetId, 0L) <= System.currentTimeMillis()) enderCurses.remove(targetId);
         }, Math.max(1, duration / 50L));
@@ -1203,10 +1202,20 @@ public final class Infuse extends JavaPlugin {
             }
             case "emerald" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, durationTicks, 4, true, false, true));
             case "ender" -> {
-                org.bukkit.block.Block targetBlock = p.getTargetBlockExact(15);
+                int maxDistance = Math.max(1, getConfig().getInt("effects.ender.teleport-max-radius", 15));
+                org.bukkit.block.Block targetBlock = p.getTargetBlockExact(maxDistance);
+                org.bukkit.Location destination;
                 if (targetBlock != null && targetBlock.getType().isSolid()) {
-                    org.bukkit.Location destination = targetBlock.getLocation().add(0.5, 1, 0.5);
-                    if (destination.getWorld() == p.getWorld() && destination.distanceSquared(p.getLocation()) <= 225) p.teleport(destination);
+                    destination = targetBlock.getLocation().add(0.5, 1, 0.5);
+                } else {
+                    destination = p.getLocation().clone().add(p.getLocation().getDirection().normalize().multiply(maxDistance));
+                }
+                if (destination.getWorld() == p.getWorld() && destination.distanceSquared(p.getLocation()) <= maxDistance * maxDistance + 1) {
+                    org.bukkit.Location safeDestination = destination.clone();
+                    if (!safeDestination.getBlock().isPassable() || !safeDestination.clone().add(0, 1, 0).getBlock().isPassable()) {
+                        safeDestination.setY(safeDestination.getY() + 1);
+                    }
+                    p.teleport(safeDestination);
                 }
                 for (org.bukkit.entity.Entity entity : p.getNearbyEntities(2, 2, 2)) {
                     if (entity instanceof Player target) {
@@ -1697,7 +1706,8 @@ public final class Infuse extends JavaPlugin {
             if (active.contains("ender")) {
                 for (Player other : player.getWorld().getPlayers()) {
                     if (other.equals(player) || trustManager.getTrusted(player.getUniqueId()).contains(other.getUniqueId())) continue;
-                    if (other.getLocation().distanceSquared(player.getLocation()) <= 64) {
+                    double glowRadius = getConfig().getDouble("effects.ender.untrust-glow-radius", 5.0);
+                    if (other.getLocation().distanceSquared(player.getLocation()) <= glowRadius * glowRadius) {
                         other.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 40, 0, true, false, true));
                     }
                 }
