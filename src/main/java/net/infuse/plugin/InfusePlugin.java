@@ -766,6 +766,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         boolean[] isAugmented = augmented.getOrDefault(id, new boolean[]{false, false});
         if (current[0] != null && !current[0].isBlank()) event.getDrops().add(createEffectItem(current[0], isAugmented[0]));
         if (current[1] != null && !current[1].isBlank()) event.getDrops().add(createEffectItem(current[1], isAugmented[1]));
+        if (current[0] != null && !current[0].isBlank()) addHistory(id, 0, "none", false);
+        if (current[1] != null && !current[1].isBlank()) addHistory(id, 1, "none", false);
         current[0] = ""; current[1] = "";
         isAugmented[0] = false; isAugmented[1] = false;
         saveData();
