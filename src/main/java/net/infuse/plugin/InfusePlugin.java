@@ -138,6 +138,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             String temp = values[0]; values[0] = values[1]; values[1] = temp;
             boolean[] isAugmented = augmented.computeIfAbsent(p.getUniqueId(), ignored -> new boolean[]{false, false});
             boolean tempAugmented = isAugmented[0]; isAugmented[0] = isAugmented[1]; isAugmented[1] = tempAugmented;
+            addHistory(p.getUniqueId(), 0, values[0].isBlank() ? "none" : values[0], isAugmented[0]);
+            addHistory(p.getUniqueId(), 1, values[1].isBlank() ? "none" : values[1], isAugmented[1]);
             saveData(); p.sendMessage(mini.deserialize("<green>Swapped your Infuse effects.")); return true;
         }
         if (command.getName().equalsIgnoreCase("recipes")) {
@@ -171,8 +173,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             if (args.length < 2 || !args[1].matches("primary|secondary|both")) { p.sendMessage("Usage: /infuse clear <primary|secondary|both>"); return true; }
             String[] s = slots(p.getUniqueId());
             boolean[] isAugmented = augmented.computeIfAbsent(p.getUniqueId(), ignored -> new boolean[]{false, false});
-            if (args[1].equalsIgnoreCase("primary") || args[1].equalsIgnoreCase("both")) { s[0] = ""; isAugmented[0] = false; }
-            if (args[1].equalsIgnoreCase("secondary") || args[1].equalsIgnoreCase("both")) { s[1] = ""; isAugmented[1] = false; }
+            if (args[1].equalsIgnoreCase("primary") || args[1].equalsIgnoreCase("both")) { s[0] = ""; isAugmented[0] = false; addHistory(p.getUniqueId(), 0, "none", false); }
+            if (args[1].equalsIgnoreCase("secondary") || args[1].equalsIgnoreCase("both")) { s[1] = ""; isAugmented[1] = false; addHistory(p.getUniqueId(), 1, "none", false); }
             saveData(); p.sendMessage(mini.deserialize(message("effect-cleared"))); return true;
         }
         if (args[0].equalsIgnoreCase("spark")) {
@@ -249,16 +251,26 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             return true;
         }
         if (action.equals("history")) {
-            sender.sendMessage(mini.deserialize("<yellow>No saved change history is available yet for " + target.getName() + "."));
+            if (slot == null || (!slot.equals("primary") && !slot.equals("p") && !slot.equals("secondary") && !slot.equals("s"))) {
+                sender.sendMessage("Usage: /infuse history -p=<player> -s=<primary|secondary>"); return true;
+            }
+            List<String> entries = (slot.equals("primary") || slot.equals("p") ? primaryHistory : secondaryHistory).getOrDefault(target.getUniqueId(), List.of());
+            sender.sendMessage(mini.deserialize("<yellow>History: " + target.getName() + " [" + slot + "]"));
+            if (entries.isEmpty()) sender.sendMessage(mini.deserialize("<gray>No history found."));
+            else for (int i = 0; i < entries.size(); i++) {
+                String[] parts = entries.get(i).split(":");
+                sender.sendMessage(mini.deserialize("<gray>" + (i + 1) + ". <white>" + parts[0] + " <gray>(augmented: " + (parts.length > 1 ? parts[1] : "false") + ") <dark_gray>@ <gray>" + (parts.length > 2 ? parts[2] : "?")));
+            }
             return true;
         }
         if (action.equals("remove")) {
             if (slot == null || slot.equals("both")) {
                 current[0] = ""; current[1] = ""; aug[0] = false; aug[1] = false;
+                addHistory(target.getUniqueId(), 0, "none", false); addHistory(target.getUniqueId(), 1, "none", false);
             } else if (slot.equals("primary") || slot.equals("p")) {
-                current[0] = ""; aug[0] = false;
+                current[0] = ""; aug[0] = false; addHistory(target.getUniqueId(), 0, "none", false);
             } else if (slot.equals("secondary") || slot.equals("s")) {
-                current[1] = ""; aug[1] = false;
+                current[1] = ""; aug[1] = false; addHistory(target.getUniqueId(), 1, "none", false);
             } else { sender.sendMessage("Slot must be primary, secondary, or both."); return true; }
             saveData();
             sender.sendMessage(mini.deserialize("<yellow>Removed Infuse effect from " + target.getName() + "."));
@@ -278,6 +290,11 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         } else { sender.sendMessage("Slot must be primary, secondary, or both."); return true; }
         equipped.put(target.getUniqueId(), next);
         augmented.put(target.getUniqueId(), nextAug);
+        for (int slotIndex = 0; slotIndex < 2; slotIndex++) {
+            if (!Objects.equals(current[slotIndex], next[slotIndex]) || aug[slotIndex] != nextAug[slotIndex]) {
+                addHistory(target.getUniqueId(), slotIndex, next[slotIndex].isBlank() ? "none" : next[slotIndex], nextAug[slotIndex]);
+            }
+        }
         saveData();
         sender.sendMessage(mini.deserialize("<green>Applied " + (isAugmented ? "augmented " : "") + title(effect) + " to " + target.getName() + "."));
         return true;
@@ -512,6 +529,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
         current[target] = effect;
         currentAugmented[target] = isAugmented;
+        addHistory(player.getUniqueId(), target, effect, isAugmented);
         saveData();
         player.sendMessage(mini.deserialize("<green>Applied <white>" + (isAugmented ? "Augmented " : "") + title(effect) + "<green> to your " + (target == 0 ? "primary" : "secondary") + " slot."));
         player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1.0f, target == 0 ? 1.1f : 1.4f);
