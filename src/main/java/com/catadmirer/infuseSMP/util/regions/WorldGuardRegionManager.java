@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Optional WorldGuard bridge for Infuse's disabled-region list. */
-public final class WorldGuardRegionManager {
+public final class WorldGuardRegionManager implements RegionManager {
     private final Infuse plugin;
 
     public WorldGuardRegionManager(Infuse plugin) {
