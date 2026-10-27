@@ -1,6 +1,7 @@
 package com.catadmirer.infuseSMP;
 
 import com.catadmirer.infuseSMP.effects.EffectRegistry;
+import com.catadmirer.infuseSMP.extraeffects.AugmentationManager;
 import com.catadmirer.infuseSMP.managers.MessageManager;
 import com.catadmirer.infuseSMP.util.trust.TrustManager;
 import com.catadmirer.infuseSMP.gui.CraftingGui;
@@ -47,6 +48,7 @@ public final class Infuse extends JavaPlugin {
     private final Map<UUID, boolean[]> augmented = new HashMap<>();
     private final Map<UUID, String[]> controls = new HashMap<>();
     private final TrustManager trustManager = new TrustManager();
+    private final AugmentationManager augmentationManager = new AugmentationManager();
     private final Map<UUID, List<String>> primaryHistory = new HashMap<>();
     private final Map<UUID, List<String>> secondaryHistory = new HashMap<>();
     private final Map<UUID, Boolean> displayEnabled = new HashMap<>();
@@ -1145,20 +1147,8 @@ public final class Infuse extends JavaPlugin {
         spark(p, "primary");
     }
     private int cooldownDivisor(UUID playerId, String effect) {
-        String[] current = slots(playerId);
-        boolean[] isAugmented = augmented.getOrDefault(playerId, new boolean[]{false, false});
-        int points = 0;
-        for (int slot = 0; slot < current.length; slot++) {
-            if (!effect.equals(current[slot])) continue;
-            points++;
-            if (isAugmented[slot]) points++;
-        }
-        return switch (points) {
-            case 2 -> 2;
-            case 3 -> 3;
-            case 4 -> 4;
-            default -> 1;
-        };
+        return augmentationManager.cooldownDivisor(
+                slots(playerId), augmented.getOrDefault(playerId, new boolean[]{false, false}), effect);
     }
 
     private void spark(Player p, String requestedSlot) {
