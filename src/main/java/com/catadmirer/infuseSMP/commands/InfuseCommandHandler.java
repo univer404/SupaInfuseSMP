@@ -1,6 +1,6 @@
-package com.catadmirer.infuseSMP.commands;
+package com.supainfuse.smp.commands;
 
-import com.catadmirer.infuseSMP.Infuse;
+import com.supainfuse.smp.Infuse;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
