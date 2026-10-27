@@ -268,9 +268,13 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         String path;
         String value = null;
         if (action.equals("get")) {
-            path = args.length >= 3 ? "effects." + clean(args[1]) + "." + normalizeKey(args[2]) : normalizeConfigPath(args[1]);
+            if (args.length >= 3 && EFFECTS.contains(clean(args[1]))) path = "effects." + clean(args[1]) + "." + normalizeKey(args[2]);
+            else path = normalizeConfigPath(String.join(".", Arrays.copyOfRange(args, 1, args.length)));
         } else if (args.length >= 4 && EFFECTS.contains(clean(args[1])) && !args[1].contains(".")) {
             path = "effects." + clean(args[1]) + "." + normalizeKey(args[2]);
+            value = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+        } else if (args.length >= 4 && (args[1].equalsIgnoreCase("settings") || args[1].equalsIgnoreCase("crafting"))) {
+            path = normalizeConfigPath(args[1] + "." + args[2]);
             value = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
         } else {
             path = normalizeConfigPath(args[1]);
