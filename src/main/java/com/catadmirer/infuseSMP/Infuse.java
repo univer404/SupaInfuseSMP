@@ -1588,9 +1588,10 @@ public final class Infuse extends JavaPlugin {
         int interval = Math.max(1, getConfig().getInt("effects.invisibility.invis-interval-ticks", 4));
         int iterations = Math.max(1, (durationTicks + interval - 1) / interval);
         final int[] elapsed = {0};
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(this, runningTask -> {
+        final BukkitTask[] taskHolder = new BukkitTask[1];
+        taskHolder[0] = Bukkit.getScheduler().runTaskTimer(this, () -> {
             if (!player.isOnline() || disabled(player) || elapsed[0] >= iterations) {
-                runningTask.cancel();
+                taskHolder[0].cancel();
                 finishInvisibilitySpark(player);
                 return;
             }
@@ -1625,7 +1626,7 @@ public final class Infuse extends JavaPlugin {
             player.getWorld().spawnParticle(org.bukkit.Particle.SQUID_INK,
                     player.getLocation().add(0, 1, 0), 12, radius * 0.45, 0.8, radius * 0.45, 0.01);
         }, 0L, interval);
-        invisibilitySparkTasks.put(casterId, task);
+        invisibilitySparkTasks.put(casterId, taskHolder[0]);
     }
 
     private void finishInvisibilitySpark(Player caster) {
