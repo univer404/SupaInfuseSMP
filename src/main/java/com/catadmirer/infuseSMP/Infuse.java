@@ -55,9 +55,11 @@ public final class Infuse extends JavaPlugin {
     private final Map<String, Integer> hitCounters = new HashMap<>();
     private final Map<String, Integer> hitPairs = new HashMap<>();
     private final Map<UUID, Deque<DamageSample>> recentDamage = new HashMap<>();
-    private final Map<UUID, Integer> hasteStacks = new HashMap<>();
+    private final Map<UUID, Double> hasteStacks = new HashMap<>();
     private final Map<UUID, org.bukkit.attribute.AttributeModifier> hasteModifiers = new HashMap<>();
-    private final Map<UUID, org.bukkit.scheduler.BukkitTask> hasteResetTasks = new HashMap<>();
+    private final Map<UUID, org.bukkit.attribute.AttributeModifier> hasteBreakSpeedModifiers = new HashMap<>();
+    private final Map<UUID, org.bukkit.attribute.AttributeModifier> hasteSparkBreakSpeedModifiers = new HashMap<>();
+    private final Map<UUID, org.bukkit.attribute.AttributeModifier> hasteSparkAttackSpeedModifiers = new HashMap<>();
     private final Map<UUID, Double> speedStacks = new HashMap<>();
     private final Map<UUID, org.bukkit.attribute.AttributeModifier> speedModifiers = new HashMap<>();
     private final Map<UUID, org.bukkit.attribute.AttributeModifier> frostSpeedModifiers = new HashMap<>();
@@ -945,31 +947,80 @@ public final class Infuse extends JavaPlugin {
         speedModifiers.put(id, modifier);
     }
 
-    private void addHasteStack(Player player) {
+    private void addHasteStack(Player player, double change) {
         UUID id = player.getUniqueId();
         var attribute = player.getAttribute(Attribute.ATTACK_SPEED);
         if (attribute == null) return;
         org.bukkit.attribute.AttributeModifier previous = hasteModifiers.remove(id);
         if (previous != null) attribute.removeModifier(previous);
-        int stacks = hasteStacks.merge(id, 1, Integer::sum);
-        double amount = getConfig().getDouble("effects.haste.attack-speed-stack", 0.2) * stacks;
+        double stack = Math.max(0.0, Math.min(1.0, hasteStacks.getOrDefault(id, 0.0) + change));
+        if (stack <= 0.0001) {
+            hasteStacks.remove(id);
+            return;
+        }
+        hasteStacks.put(id, stack);
         org.bukkit.attribute.AttributeModifier modifier = new org.bukkit.attribute.AttributeModifier(
-                new NamespacedKey(this, "haste_stack_" + id), amount, org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER);
+                new NamespacedKey(this, "haste_stack_" + id), stack,
+                org.bukkit.attribute.AttributeModifier.Operation.MULTIPLY_SCALAR_1);
         attribute.addModifier(modifier);
         hasteModifiers.put(id, modifier);
-        org.bukkit.scheduler.BukkitTask oldTask = hasteResetTasks.remove(id);
-        if (oldTask != null) oldTask.cancel();
-        int resetTicks = Math.max(1, getConfig().getInt("effects.haste.iframe-duration", 19));
-        hasteResetTasks.put(id, Bukkit.getScheduler().runTaskLater(this, () -> {
-            Player online = Bukkit.getPlayer(id);
-            if (online != null) {
-                var currentAttribute = online.getAttribute(Attribute.ATTACK_SPEED);
-                org.bukkit.attribute.AttributeModifier currentModifier = hasteModifiers.remove(id);
-                if (currentAttribute != null && currentModifier != null) currentAttribute.removeModifier(currentModifier);
-            }
-            hasteStacks.remove(id);
-            hasteResetTasks.remove(id);
-        }, resetTicks));
+    }
+
+    private void decayHasteStack(Player player) {
+        double stack = hasteStacks.getOrDefault(player.getUniqueId(), 0.0);
+        if (stack <= 0) return;
+        addHasteStack(player, getConfig().getDouble("effects.haste.decay-amount", -0.1));
+    }
+
+    private void updateHasteBreakSpeed(Player player, boolean enabled) {
+        UUID id = player.getUniqueId();
+        var attribute = player.getAttribute(Attribute.BLOCK_BREAK_SPEED);
+        if (attribute == null) return;
+        org.bukkit.attribute.AttributeModifier previous = hasteBreakSpeedModifiers.remove(id);
+        if (previous != null) attribute.removeModifier(previous);
+        if (!enabled) return;
+        double multiplier = Math.max(1.0, getConfig().getDouble("effects.haste.break-speed-multiplier", 1.5));
+        org.bukkit.attribute.AttributeModifier modifier = new org.bukkit.attribute.AttributeModifier(
+                new NamespacedKey(this, "haste_break_speed_" + id), multiplier - 1.0,
+                org.bukkit.attribute.AttributeModifier.Operation.MULTIPLY_SCALAR_1);
+        attribute.addModifier(modifier);
+        hasteBreakSpeedModifiers.put(id, modifier);
+    }
+
+    private void activateHasteSpark(Player player) {
+        UUID id = player.getUniqueId();
+        var attackSpeed = player.getAttribute(Attribute.ATTACK_SPEED);
+        var breakSpeed = player.getAttribute(Attribute.BLOCK_BREAK_SPEED);
+        if (attackSpeed != null) {
+            org.bukkit.attribute.AttributeModifier old = hasteSparkAttackSpeedModifiers.remove(id);
+            if (old != null) attackSpeed.removeModifier(old);
+            org.bukkit.attribute.AttributeModifier modifier = new org.bukkit.attribute.AttributeModifier(
+                    new NamespacedKey(this, "haste_spark_attack_speed_" + id),
+                    getConfig().getDouble("effects.haste.spark-atkspd-increase", 0.5),
+                    org.bukkit.attribute.AttributeModifier.Operation.MULTIPLY_SCALAR_1);
+            attackSpeed.addModifier(modifier);
+            hasteSparkAttackSpeedModifiers.put(id, modifier);
+        }
+        if (breakSpeed != null) {
+            org.bukkit.attribute.AttributeModifier old = hasteSparkBreakSpeedModifiers.remove(id);
+            if (old != null) breakSpeed.removeModifier(old);
+            org.bukkit.attribute.AttributeModifier modifier = new org.bukkit.attribute.AttributeModifier(
+                    new NamespacedKey(this, "haste_spark_break_speed_" + id),
+                    getConfig().getDouble("effects.haste.spark-break-speed-multiplier", 1024.0),
+                    org.bukkit.attribute.AttributeModifier.Operation.MULTIPLY_SCALAR_1);
+            breakSpeed.addModifier(modifier);
+            hasteSparkBreakSpeedModifiers.put(id, modifier);
+        }
+    }
+
+    private void clearHasteSpark(Player player) {
+        UUID id = player.getUniqueId();
+        var attackSpeed = player.getAttribute(Attribute.ATTACK_SPEED);
+        var breakSpeed = player.getAttribute(Attribute.BLOCK_BREAK_SPEED);
+        org.bukkit.attribute.AttributeModifier attack = hasteSparkAttackSpeedModifiers.remove(id);
+        org.bukkit.attribute.AttributeModifier breaking = hasteSparkBreakSpeedModifiers.remove(id);
+        if (attackSpeed != null && attack != null) attackSpeed.removeModifier(attack);
+        if (breakSpeed != null && breaking != null) breakSpeed.removeModifier(breaking);
     }
 
     private void transferExperience(Player from, Player to, int amount) {
@@ -1135,6 +1186,7 @@ public final class Infuse extends JavaPlugin {
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (sparkEnds.getOrDefault(key, 0L) <= System.currentTimeMillis()) {
                 sparkEnds.remove(key);
+                if (effect.equals("haste")) clearHasteSpark(p);
                 if (effect.equals("ender") && enderSparkCooldownReset.remove(p.getUniqueId())) cooldowns.remove(key);
                 else cooldowns.put(key, System.currentTimeMillis() + cooldownSeconds * 1000L);
             }
@@ -1157,7 +1209,7 @@ public final class Infuse extends JavaPlugin {
                 p.setVelocity(p.getVelocity().setY(getConfig().getDouble("effects.feather.initial-bounce-power", 1.2)));
                 activateFeatherShockwave(p);
             }
-            case "haste" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, durationTicks, 255, true, false, true));
+            case "haste" -> activateHasteSpark(p);
             case "strength" -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, durationTicks, 1, true, false, true));
             case "regeneration" -> activateRegenerationSpark(p);
             case "heart" -> {
@@ -1703,10 +1755,12 @@ public final class Infuse extends JavaPlugin {
             Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
             active.remove("");
             if (!active.contains("speed")) clearSpeedStack(player);
-            if (!active.contains("haste")) clearHasteStack(player);
+            if (!active.contains("haste")) { clearHasteStack(player); updateHasteBreakSpeed(player, false); }
             if (!active.contains("feather")) windCharges.remove(player.getUniqueId());
             if (active.contains("speed")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
             if (active.contains("haste")) {
+                decayHasteStack(player);
+                updateHasteBreakSpeed(player, true);
                 player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 0, true, false, true));
                 applyToolEnchant(player.getInventory().getItemInMainHand(), enchantment("fortune"), 5);
                 applyToolEnchant(player.getInventory().getItemInMainHand(), enchantment("unbreaking"), 10);
@@ -1915,7 +1969,7 @@ public final class Infuse extends JavaPlugin {
         }
         if (trustedTarget) return;
         if (active.contains("haste")) {
-            addHasteStack(attacker);
+            addHasteStack(attacker, getConfig().getDouble("effects.haste.attack-speed-stack", 0.2));
             int iframeTicks = Math.max(0, getConfig().getInt("effects.haste.iframe-duration", 19));
             Bukkit.getScheduler().runTaskLater(this, () -> target.setNoDamageTicks(iframeTicks), 1L);
         }
@@ -2161,8 +2215,8 @@ public final class Infuse extends JavaPlugin {
         var attribute = player.getAttribute(Attribute.ATTACK_SPEED);
         if (attribute != null && modifier != null) attribute.removeModifier(modifier);
         hasteStacks.remove(id);
-        org.bukkit.scheduler.BukkitTask task = hasteResetTasks.remove(id);
-        if (task != null) task.cancel();
+        updateHasteBreakSpeed(player, false);
+        clearHasteSpark(player);
     }
 
     @EventHandler public void join(PlayerJoinEvent e) {
