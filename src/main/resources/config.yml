@@ -89,12 +89,17 @@ effects:
     spark-seconds: 15
     craft-limit: -1
     augment-limit: 0
+    spark-heal-radius: 8
+    spark-heal-iteration: 15
+    spark-heal-percentage: 0.2
   speed:
     color: "#D1A44B"
     cooldown-seconds: 60
     spark-seconds: 15
     craft-limit: -1
     augment-limit: 0
+    dash-power: 2.6
+    dash-true-damage: 2.0
   strength:
     color: "#9E2020"
     cooldown-seconds: 60
