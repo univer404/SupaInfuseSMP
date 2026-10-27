@@ -774,17 +774,20 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 org.bukkit.util.Vector direction = p.getLocation().getDirection().setY(0).normalize().multiply(getConfig().getDouble("effects.speed.dash-power", 2.6));
                 p.setVelocity(direction.setY(Math.max(0.15, p.getVelocity().getY())));
                 p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationTicks, 1, true, false, true));
+                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(1.5, 1.5, 1.5)) {
+                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
+                    if (entity instanceof Player target && trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                    living.damage(getConfig().getDouble("effects.speed.dash-true-damage", 2.0), p);
+                    p.getWorld().spawnParticle(org.bukkit.Particle.SWEEP_ATTACK, living.getLocation().add(0, 1, 0), 4, 0.3, 0.3, 0.3, 0);
+                }
             }
             case "feather" -> {
                 p.setVelocity(p.getVelocity().setY(Math.max(1.1, p.getVelocity().getY())));
                 p.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, durationTicks, 0, true, false, true));
             }
-            case "haste" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, durationTicks, 1, true, false, true));
+            case "haste" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, durationTicks, 255, true, false, true));
             case "strength" -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, durationTicks, 1, true, false, true));
-            case "regeneration" -> {
-                p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, durationTicks, 1, true, false, true));
-                healTrustedNearby(p, 8, 0.2);
-            }
+            case "regeneration" -> activateRegenerationSpark(p);
             case "heart" -> {
                 var attribute = p.getAttribute(Attribute.MAX_HEALTH);
                 if (attribute != null) attribute.setBaseValue(40.0);
@@ -843,10 +846,35 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                     org.bukkit.Location destination = targetBlock.getLocation().add(0.5, 1, 0.5);
                     if (destination.getWorld() == p.getWorld() && destination.distanceSquared(p.getLocation()) <= 225) p.teleport(destination);
                 }
+                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(2, 2, 2)) {
+                    if (entity instanceof Player target) {
+                        if (trusted.getOrDefault(p.getUniqueId(), Set.of()).contains(target.getUniqueId())) continue;
+                        target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, durationTicks, 0, true, false, true));
+                        cooldowns.remove(key);
+                    } else if (entity instanceof org.bukkit.entity.LivingEntity living &&
+                            living.getType() != org.bukkit.entity.EntityType.ENDER_DRAGON &&
+                            living.getType() != org.bukkit.entity.EntityType.WITHER &&
+                            living.getType() != org.bukkit.entity.EntityType.WARDEN) {
+                        living.setHealth(0);
+                    }
+                }
             }
             case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
         }
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
+    }
+
+    private void activateRegenerationSpark(Player caster) {
+        int iterations = Math.max(1, getConfig().getInt("effects.regeneration.spark-heal-iteration", 15));
+        double percentage = getConfig().getDouble("effects.regeneration.spark-heal-percentage", 0.2) / iterations;
+        final int[] completed = {0};
+        Bukkit.getScheduler().runTaskTimer(this, task -> {
+            if (!caster.isOnline() || completed[0] >= iterations) { task.cancel(); return; }
+            healTrustedNearby(caster, getConfig().getDouble("effects.regeneration.spark-heal-radius", 8), percentage);
+            caster.getWorld().spawnParticle(org.bukkit.Particle.HEART, caster.getLocation().add(0, 1, 0), 3, 0.4, 0.5, 0.4, 0);
+            completed[0]++;
+            if (completed[0] >= iterations) task.cancel();
+        }, 0L, 20L);
     }
 
     private void applyToolEnchant(ItemStack item, org.bukkit.enchantments.Enchantment enchantment, int level) {
