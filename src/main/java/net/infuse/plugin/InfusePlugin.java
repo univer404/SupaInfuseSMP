@@ -33,6 +33,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> hitCounters = new HashMap<>();
+    private final Map<UUID, Long> trustActionCooldowns = new HashMap<>();
     private NamespacedKey effectKey;
     private InfuseGui gui;
     private InfuseRecipeBookGui recipeGui;
@@ -230,6 +231,18 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         return true;
     }
 
+    private boolean beginTrustAction(Player player) {
+        long now = System.currentTimeMillis();
+        long cooldown = Math.max(0, getConfig().getLong("settings.trust-list-delay-seconds", 10)) * 1000L;
+        long until = trustActionCooldowns.getOrDefault(player.getUniqueId(), 0L);
+        if (until > now) {
+            player.sendMessage(mini.deserialize("<red>Please wait " + ((until - now + 999) / 1000) + "s before changing your trust list again."));
+            return false;
+        }
+        trustActionCooldowns.put(player.getUniqueId(), now + cooldown);
+        return true;
+    }
+
     private boolean trustCommand(CommandSender sender, String[] args) {
         if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
         if (args.length == 0) { p.sendMessage("/trust <add|remove|list|clear> [player]"); return true; }
@@ -242,13 +255,37 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 if (target.equals(p)) { p.sendMessage("You cannot trust yourself."); return true; }
                 int max = getConfig().getInt("settings.trust-list-max", 3);
                 if (!list.contains(target.getUniqueId()) && list.size() >= max) { tell(p, "trust-limit"); return true; }
-                list.add(target.getUniqueId()); saveData();
-                p.sendMessage(mini.deserialize(message("trust-added").replace("{player}", target.getName())));
+                if (!beginTrustAction(p)) return true;
+                UUID ownerId = p.getUniqueId(), targetId = target.getUniqueId();
+                String targetName = target.getName();
+                long delay = Math.max(0, getConfig().getLong("settings.trust-list-delay-seconds", 10));
+                p.sendMessage(mini.deserialize("<yellow>Trust update queued. It will apply in " + delay + " seconds."));
+                Bukkit.getScheduler().runTaskLater(this, () -> {
+                    Set<UUID> current = trusted.computeIfAbsent(ownerId, ignored -> new HashSet<>());
+                    if (!current.contains(targetId) && current.size() >= getConfig().getInt("settings.trust-list-max", 3)) {
+                        Player owner = Bukkit.getPlayer(ownerId);
+                        if (owner != null) tell(owner, "trust-limit");
+                        return;
+                    }
+                    current.add(targetId); saveData();
+                    Player owner = Bukkit.getPlayer(ownerId);
+                    if (owner != null) owner.sendMessage(mini.deserialize(message("trust-added").replace("{player}", targetName)));
+                }, delay * 20L);
             }
             case "remove" -> {
                 if (args.length < 2) { p.sendMessage("/trust remove <player>"); return true; }
-                OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]); list.remove(target.getUniqueId()); saveData();
-                p.sendMessage(mini.deserialize(message("trust-removed").replace("{player}", args[1])));
+                OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+                if (!beginTrustAction(p)) return true;
+                UUID ownerId = p.getUniqueId(), targetId = target.getUniqueId();
+                String targetName = args[1];
+                long delay = Math.max(0, getConfig().getLong("settings.trust-list-delay-seconds", 10));
+                p.sendMessage(mini.deserialize("<yellow>Trust update queued. It will apply in " + delay + " seconds."));
+                Bukkit.getScheduler().runTaskLater(this, () -> {
+                    trusted.computeIfAbsent(ownerId, ignored -> new HashSet<>()).remove(targetId);
+                    saveData();
+                    Player owner = Bukkit.getPlayer(ownerId);
+                    if (owner != null) owner.sendMessage(mini.deserialize(message("trust-removed").replace("{player}", targetName)));
+                }, delay * 20L);
             }
             case "list" -> p.sendMessage("Trusted players: " + list.stream().map(id -> Optional.ofNullable(Bukkit.getOfflinePlayer(id).getName()).orElse(id.toString())).toList());
             case "clear" -> { list.clear(); saveData(); p.sendMessage("Trust list cleared."); }
