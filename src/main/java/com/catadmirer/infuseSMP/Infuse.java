@@ -1931,7 +1931,12 @@ public final class Infuse extends JavaPlugin {
                     player.setCollidable(true);
                     for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
                 }
+                clearSpeedStack(player);
+                clearHasteStack(player);
+                updateHasteBreakSpeed(player, false);
                 updateFrostModifiers(player, false);
+                updateEffectToolEnchantments(player, Set.of());
+                clearWindChargeVisuals(player.getUniqueId());
                 if (fireGlidingPlayers.remove(player.getUniqueId())) {
                     ItemStack chest = player.getInventory().getChestplate();
                     if (chest == null || chest.getType() != Material.ELYTRA) player.setGliding(false);
