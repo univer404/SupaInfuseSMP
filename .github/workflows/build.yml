@@ -5,7 +5,7 @@ on:
   pull_request:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -110,6 +110,20 @@ jobs:
           path: target/Infuse-Texture-Pack-1.21.11.zip
           if-no-files-found: error
           retention-days: 14
+      - name: Publish stable texture pack release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="tpack-1.21.11"
+          asset="target/Infuse-Texture-Pack-1.21.11.zip"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$asset" --clobber
+          else
+            gh release create "$tag" "$asset" \
+              --target "$GITHUB_SHA" \
+              --title "Infuse Texture Pack for Minecraft 1.21.11" \
+              --notes "Updated pack metadata for Minecraft 1.21.11. Original Infuse assets are preserved; in-game texture, font, model, and sound compatibility still needs client testing."
+          fi
       - name: Build plugin
         run: mvn --batch-mode --no-transfer-progress clean package
       - name: Upload plugin
