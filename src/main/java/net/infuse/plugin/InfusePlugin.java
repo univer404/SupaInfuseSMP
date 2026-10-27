@@ -1007,6 +1007,75 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         saveData();
     }
 
+    public String placeholderValue(OfflinePlayer offlinePlayer, String identifier) {
+        UUID playerId = offlinePlayer.getUniqueId();
+        String key = identifier.toLowerCase(Locale.ROOT);
+        int slot = key.endsWith("_secondary") ? 1 : 0;
+        String[] current = slots(playerId);
+        String effect = current[slot];
+        boolean[] isAugmented = augmented.getOrDefault(playerId, new boolean[]{false, false});
+        switch (key) {
+            case "effect_name_primary", "effect_name_secondary" -> {
+                return effect == null || effect.isBlank() ? "" : title(effect);
+            }
+            case "effect_augmented_primary", "effect_augmented_secondary" -> {
+                return Boolean.toString(!effect.isBlank() && isAugmented[slot]);
+            }
+            case "effect_icon_primary", "effect_icon_secondary" -> {
+                if (effect == null || effect.isBlank()) return "";
+                return new String(Character.toChars(effectIconCodePoint(effect, isAugmented[slot])));
+            }
+            case "effect_timer_main_primary", "effect_timer_main_secondary" -> {
+                long remaining = remainingEffectMillis(playerId, effect);
+                if (remaining <= 0) return "";
+                long totalSeconds = (remaining + 999) / 1000;
+                return (totalSeconds / 60) + ":" + String.format(Locale.ROOT, "%02d", totalSeconds % 60);
+            }
+            case "effect_timer_alt_primary", "effect_timer_alt_secondary" -> {
+                long remaining = remainingEffectMillis(playerId, effect);
+                if (remaining <= 0) return "";
+                long ticks = (remaining + 49) / 50;
+                long minutes = ticks / 1200;
+                long seconds = (ticks / 20) % 60;
+                long centiseconds = (ticks % 20) * 5;
+                return minutes + ":" + String.format(Locale.ROOT, "%02d:%02d", seconds, centiseconds);
+            }
+            case "effect_spark_ticks_primary", "effect_spark_ticks_secondary" -> {
+                if (effect == null || effect.isBlank()) return "0";
+                return Long.toString(remainingTicks(sparkEnds.getOrDefault(playerId + ":" + effect, 0L)));
+            }
+            case "effect_cooldown_ticks_primary", "effect_cooldown_ticks_secondary" -> {
+                if (effect == null || effect.isBlank()) return "0";
+                return Long.toString(remainingTicks(cooldowns.getOrDefault(playerId + ":" + effect, 0L)));
+            }
+            default -> { return ""; }
+        }
+    }
+
+    private long remainingEffectMillis(UUID playerId, String effect) {
+        if (effect == null || effect.isBlank()) return 0;
+        String key = playerId + ":" + effect;
+        long now = System.currentTimeMillis();
+        long active = sparkEnds.getOrDefault(key, 0L);
+        return Math.max(0, (active > now ? active : cooldowns.getOrDefault(key, 0L)) - now);
+    }
+
+    private long remainingTicks(long untilMillis) {
+        return Math.max(0, (untilMillis - System.currentTimeMillis() + 49) / 50);
+    }
+
+    private int effectIconCodePoint(String effect, boolean isAugmented) {
+        int codePoint = 0xE000;
+        for (String currentEffect : EFFECTS) {
+            if (currentEffect.equals(effect)) {
+                if (currentEffect.equals("earth") || currentEffect.equals("ender")) return codePoint + 20;
+                return codePoint + (isAugmented ? 41 : 20);
+            }
+            codePoint += currentEffect.equals("earth") || currentEffect.equals("ender") ? 42 : 84;
+        }
+        return 0xE000;
+    }
+
     private String displaySlot(UUID playerId, int index) {
         String[] current = slots(playerId);
         String effect = current[index];
