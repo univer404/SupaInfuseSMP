@@ -638,10 +638,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                     living.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, durationTicks, 1, true, false, true));
                 }
             }
-            case "emerald" -> {
-                p.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, durationTicks, 4, true, false, true));
-                p.giveExp(getConfig().getInt("effects.emerald.spark-xp-gain", 2));
-            }
+            case "emerald" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, durationTicks, 4, true, false, true));
             case "ender" -> {
                 org.bukkit.block.Block targetBlock = p.getTargetBlockExact(15);
                 if (targetBlock != null && targetBlock.getType().isSolid()) {
