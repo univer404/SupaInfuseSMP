@@ -48,7 +48,7 @@ public final class RecipeBookGui implements Listener {
 
     private void openRecipe(Player player, String effect) {
         Inventory inventory = newMenu(player, gui.getString("recipes.title", "<gradient:#A2C81C:#21CD76>Recipes"));
-        List<String> recipe = InfuseCraftingGui.RECIPES.get(effect);
+        List<String> recipe = CraftingGui.RECIPES.get(effect);
         if (recipe != null) {
             for (int i = 0; i < RECIPE_SLOTS.length; i++) {
                 Material material = Material.matchMaterial(recipe.get(i));
