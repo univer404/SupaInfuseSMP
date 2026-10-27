@@ -132,39 +132,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
             reloadConfig(); saveDefaultConfig(); sender.sendMessage(mini.deserialize(message("reload"))); return true;
         }
-        if (args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("remove") || args[0].equalsIgnoreCase("get")) {
-            if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
-            if (args.length < 2) { sender.sendMessage("/infuse <add|remove|get> <player> [effect] [primary|secondary|augmented]"); return true; }
-            Player target = Bukkit.getPlayerExact(args[1]);
-            if (target == null) { tell(sender, "not-player"); return true; }
-            String[] targetSlots = slots(target.getUniqueId());
-            if (args[0].equalsIgnoreCase("get")) {
-                sender.sendMessage(mini.deserialize("<yellow>" + target.getName() + " <gray>Primary: <white>" + display(targetSlots[0]) + " <gray>| Secondary: <white>" + display(targetSlots[1])));
-                return true;
-            }
-            if (args[0].equalsIgnoreCase("remove")) {
-                String slot = args.length > 2 ? args[2].toLowerCase(Locale.ROOT) : "both";
-                if (slot.equals("both")) { targetSlots[0] = ""; targetSlots[1] = ""; }
-                else if (slot.equals("primary") || slot.equals("p")) targetSlots[0] = "";
-                else if (slot.equals("secondary") || slot.equals("s")) targetSlots[1] = "";
-                else { sender.sendMessage("Slot must be primary, secondary, or both."); return true; }
-                saveData(); sender.sendMessage(mini.deserialize("<yellow>Removed Infuse effect from " + target.getName() + ".")); return true;
-            }
-            if (args.length < 3) { sender.sendMessage("/infuse add <player> <effect> [primary|secondary|both] [augmented]"); return true; }
-            String effect = clean(args[2]);
-            if (!EFFECTS.contains(effect)) { tell(sender, "unknown-effect"); return true; }
-            String slot = args.length > 3 ? args[3].toLowerCase(Locale.ROOT) : "both";
-            if (slot.equals("both")) { targetSlots[0] = effect; targetSlots[1] = effect; }
-            else if (slot.equals("primary") || slot.equals("p")) targetSlots[0] = effect;
-            else if (slot.equals("secondary") || slot.equals("s")) targetSlots[1] = effect;
-            else { sender.sendMessage("Slot must be primary, secondary, or both."); return true; }
-            if (!getConfig().getBoolean("settings.allow-same-effects", false) && !targetSlots[0].isBlank() && targetSlots[0].equals(targetSlots[1]) && !slot.equals("both")) {
-                sender.sendMessage(mini.deserialize("<red>The same effect cannot be equipped in both slots."));
-                return true;
-            }
-            saveData();
-            sender.sendMessage(mini.deserialize("<green>Applied " + title(effect) + " to " + target.getName() + "."));
-            return true;
+        if (args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("remove") || args[0].equalsIgnoreCase("get") || args[0].equalsIgnoreCase("history")) {
+            return adminInfuseCommand(sender, args);
         }
         if (args[0].equalsIgnoreCase("give")) {
             if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
@@ -189,6 +158,81 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             spark(p); return true;
         }
         sender.sendMessage("Usage: /infuse [gui|give|clear|spark|reload]");
+        return true;
+    }
+
+    private boolean adminInfuseCommand(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
+        String action = args[0].toLowerCase(Locale.ROOT);
+        String playerName = null, effect = null, slot = null;
+        boolean isAugmented = false;
+        List<String> positional = new ArrayList<>();
+        for (int i = 1; i < args.length; i++) {
+            String value = args[i];
+            if (value.startsWith("-p=")) playerName = value.substring(3);
+            else if (value.startsWith("-e=")) effect = clean(value.substring(3));
+            else if (value.startsWith("-s=")) slot = value.substring(3).toLowerCase(Locale.ROOT);
+            else if (value.startsWith("-a=")) isAugmented = Boolean.parseBoolean(value.substring(3));
+            else if (!value.startsWith("-")) positional.add(value);
+        }
+        if (playerName == null && !positional.isEmpty()) playerName = positional.remove(0);
+        if (effect == null && !positional.isEmpty() && EFFECTS.contains(clean(positional.get(0)))) effect = clean(positional.remove(0));
+        if (slot == null && !positional.isEmpty()) slot = positional.remove(0).toLowerCase(Locale.ROOT);
+        if (!positional.isEmpty() && positional.get(0).equalsIgnoreCase("augmented")) isAugmented = true;
+        Player target;
+        if (playerName == null) {
+            if (!(sender instanceof Player player)) { sender.sendMessage("Specify a player with -p=<name>."); return true; }
+            target = player;
+        } else {
+            target = Bukkit.getPlayerExact(playerName);
+            if (target == null) { tell(sender, "not-player"); return true; }
+        }
+        String[] current = slots(target.getUniqueId());
+        boolean[] aug = augmented.computeIfAbsent(target.getUniqueId(), ignored -> new boolean[]{false, false});
+        if (action.equals("get")) {
+            if ("primary".equals(slot) || "p".equals(slot)) sender.sendMessage(mini.deserialize("<yellow>[primary] <white>" + display(current[0]) + " <gray>(augmented: " + aug[0] + ")"));
+            else if ("secondary".equals(slot) || "s".equals(slot)) sender.sendMessage(mini.deserialize("<yellow>[secondary] <white>" + display(current[1]) + " <gray>(augmented: " + aug[1] + ")"));
+            else sender.sendMessage(mini.deserialize("<yellow>" + target.getName() + " <gray>Primary: <white>" + display(current[0]) + " <gray>(aug: " + aug[0] + ") <gray>| Secondary: <white>" + display(current[1]) + " <gray>(aug: " + aug[1] + ")"));
+            return true;
+        }
+        if (action.equals("history")) {
+            sender.sendMessage(mini.deserialize("<yellow>No saved change history is available yet for " + target.getName() + "."));
+            return true;
+        }
+        if (action.equals("remove")) {
+            if (slot == null || slot.equals("both")) {
+                current[0] = ""; current[1] = ""; aug[0] = false; aug[1] = false;
+            } else if (slot.equals("primary") || slot.equals("p")) {
+                current[0] = ""; aug[0] = false;
+            } else if (slot.equals("secondary") || slot.equals("s")) {
+                current[1] = ""; aug[1] = false;
+            } else { sender.sendMessage("Slot must be primary, secondary, or both."); return true; }
+            saveData();
+            sender.sendMessage(mini.deserialize("<yellow>Removed Infuse effect from " + target.getName() + "."));
+            return true;
+        }
+        if (effect == null || !EFFECTS.contains(effect)) { sender.sendMessage("/infuse add -p=<player> -e=<effect> [-s=primary|secondary] [-a=true]"); return true; }
+        if (effect.equals("earth") || effect.equals("ender")) isAugmented = true;
+        String selectedSlot = slot == null ? "both" : slot;
+        String[] next = current.clone();
+        boolean[] nextAug = aug.clone();
+        if (selectedSlot.equals("both")) {
+            next[0] = effect; next[1] = effect; nextAug[0] = isAugmented; nextAug[1] = isAugmented;
+        } else if (selectedSlot.equals("primary") || selectedSlot.equals("p")) {
+            next[0] = effect; nextAug[0] = isAugmented;
+        } else if (selectedSlot.equals("secondary") || selectedSlot.equals("s")) {
+            next[1] = effect; nextAug[1] = isAugmented;
+        } else { sender.sendMessage("Slot must be primary, secondary, or both."); return true; }
+        if (!getConfig().getBoolean("settings.allow-same-effects", false) && !next[0].isBlank() && next[0].equals(next[1])) {
+            if (!selectedSlot.equals("both") || !getConfig().getBoolean("settings.allow-same-effects", false)) {
+                sender.sendMessage(mini.deserialize("<red>The same effect cannot be equipped in both slots."));
+                return true;
+            }
+        }
+        equipped.put(target.getUniqueId(), next);
+        augmented.put(target.getUniqueId(), nextAug);
+        saveData();
+        sender.sendMessage(mini.deserialize("<green>Applied " + (isAugmented ? "augmented " : "") + title(effect) + " to " + target.getName() + "."));
         return true;
     }
 
