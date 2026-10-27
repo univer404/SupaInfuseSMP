@@ -1,0 +1,102 @@
+settings:
+  disabled-worlds:
+    - disabled_world
+  allow-same-effects: false
+  lock-effects: false
+  primary-effects: [heart, strength, regeneration, haste, invisibility, frost, thunder, feather]
+  secondary-effects: [speed, fire, ocean, emerald]
+  trust-list-max: 3
+  trust-list-delay-seconds: 10
+  do-roll-animation: true
+  roll-first-join: false
+  head-drop: false
+  resource-pack:
+    enabled: false
+    url: ""
+    sha1: ""
+    prompt: "Infuse includes custom textures. Download the official resource pack to see them."
+effects:
+  emerald:
+    color: "#0DFC00"
+    cooldown-seconds: 30
+    spark-seconds: 10
+    craft-limit: -1
+    augment-limit: 0
+  feather:
+    color: "#BEA3CA"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: -1
+    augment-limit: 0
+  fire:
+    color: "#FC7803"
+    cooldown-seconds: 90
+    spark-seconds: 4
+    craft-limit: -1
+    augment-limit: 0
+  frost:
+    color: "#7AE3FC"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: -1
+    augment-limit: 0
+  haste:
+    color: "#B96C00"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: -1
+    augment-limit: 0
+  heart:
+    color: "#FC0046"
+    cooldown-seconds: 120
+    spark-seconds: 60
+    craft-limit: -1
+    augment-limit: 0
+  invisibility:
+    color: "#7E00FC"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: -1
+    augment-limit: 0
+  ocean:
+    color: "#005AFC"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: -1
+    augment-limit: 0
+  regeneration:
+    color: "#FC00DD"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: -1
+    augment-limit: 0
+  speed:
+    color: "#D1A44B"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: -1
+    augment-limit: 0
+  strength:
+    color: "#9E2020"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: -1
+    augment-limit: 0
+  thunder:
+    color: "#FCED00"
+    cooldown-seconds: 90
+    spark-seconds: 10
+    craft-limit: -1
+    augment-limit: 0
+  earth:
+    color: "#8A795D"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: -1
+    augment-limit: 0
+  ender:
+    color: "#7A42AA"
+    cooldown-seconds: 60
+    spark-seconds: 15
+    craft-limit: 1
+    augment-limit: 1
