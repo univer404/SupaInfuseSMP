@@ -9,6 +9,7 @@ import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.player.PlayerExpChangeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.entity.FoodLevelChangeEvent;
 
 /** Routes effect item interactions, projectiles, inventory actions, and XP events. */
 public final class EffectItemListener implements Listener {
@@ -16,7 +17,8 @@ public final class EffectItemListener implements Listener {
 
     public EffectItemListener(Infuse plugin) { this.plugin = plugin; }
 
-    @EventHandler public void onFireSnowball(PlayerInteractEvent event) { plugin.convertFireSnowballs(event); }
+    @EventHandler public void onFireSnowball(PlayerInteractEvent event) { plugin.convertFireSnowballs(event); plugin.prepareRegenerationFood(event); }
+    @EventHandler public void onFoodLevelChange(FoodLevelChangeEvent event) { plugin.onFoodLevelChange(event); }
     @EventHandler public void onInvisibilityProjectile(ProjectileHitEvent event) { plugin.invisibilityRangedHit(event); }
     @EventHandler public void onTridentHit(ProjectileHitEvent event) { plugin.infuseTridentEffects(event); }
     @EventHandler public void onProjectileShoot(EntityShootBowEvent event) { plugin.onProjectileShoot(event); }
