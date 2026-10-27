@@ -24,6 +24,10 @@ commands:
   recipes:
     description: View Infuse crafting guidance.
     usage: /recipes
+  control:
+    description: Bind primary or secondary Spark to a player action.
+    usage: /control <primary|secondary> <action>
+    aliases: [controls, controlset, bind]
 permissions:
   infuse.admin:
     description: Manage Infuse settings and items.
