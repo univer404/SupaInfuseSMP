@@ -25,15 +25,14 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class InfusePlugin extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
-    private static final List<String> EFFECTS = List.of("earth","emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
+    static final List<String> EFFECTS = List.of("earth","emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
     private final MiniMessage mini = MiniMessage.miniMessage();
     private final Map<UUID, String[]> equipped = new HashMap<>();
     private final Map<UUID, Set<UUID>> trusted = new HashMap<>();
     private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private NamespacedKey effectKey;
-    private Inventory mainMenu;
-    private Inventory effectMenu;
+    private InfuseGui gui;
     private BukkitTask passiveTask;
 
     @Override public void onEnable() {
@@ -41,6 +40,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         saveResource("gui.yml", false);
         saveResource("messages.yml", false);
         effectKey = new NamespacedKey(this, "effect");
+        gui = new InfuseGui(this);
         loadData();
         Objects.requireNonNull(getCommand("infuse")).setExecutor(this);
         Objects.requireNonNull(getCommand("infuse")).setTabCompleter(this);
@@ -72,11 +72,14 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     private void saveData() {
         getConfig().set("players", null);
-        for (var entry : equipped.entrySet()) {
-            String path = "players." + entry.getKey();
-            getConfig().set(path + ".primary", entry.getValue()[0]);
-            getConfig().set(path + ".secondary", entry.getValue()[1]);
-            getConfig().set(path + ".trusted", trusted.getOrDefault(entry.getKey(), Set.of()).stream().map(UUID::toString).toList());
+        Set<UUID> playerIds = new HashSet<>(equipped.keySet());
+        playerIds.addAll(trusted.keySet());
+        for (UUID id : playerIds) {
+            String path = "players." + id;
+            String[] values = equipped.getOrDefault(id, new String[]{"", ""});
+            getConfig().set(path + ".primary", values[0]);
+            getConfig().set(path + ".secondary", values[1]);
+            getConfig().set(path + ".trusted", trusted.getOrDefault(id, Set.of()).stream().map(UUID::toString).toList());
         }
         saveConfig();
     }
@@ -87,7 +90,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     }
     private void tell(CommandSender sender, String key) { sender.sendMessage(mini.deserialize(message(key))); }
     private String clean(String s) { return s == null ? "" : s.toLowerCase(Locale.ROOT); }
-    private String[] slots(UUID id) { return equipped.computeIfAbsent(id, ignored -> new String[]{"", ""}); }
+    String[] slots(UUID id) { return equipped.computeIfAbsent(id, ignored -> new String[]{"", ""}); }
     private boolean disabled(Player p) { return getConfig().getStringList("settings.disabled-worlds").contains(p.getWorld().getName()); }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -154,37 +157,16 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void openMain(Player p) {
-        var gui = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.File(getDataFolder(), "gui.yml"));
-        int size = Math.max(9, Math.min(54, gui.getInt("main.rows", 3) * 9));
-        Inventory inv = Bukkit.createInventory(p, size, mini.deserialize(gui.getString("main.title", "<light_purple>Infuse")));
-        ItemStack filler = named(Material.BLACK_STAINED_GLASS_PANE, gui.getString("main.filler-name", " "));
-        for (int i=0;i<size;i++) inv.setItem(i, filler);
-        inv.setItem(gui.getInt("main.primary-slot",11), named(Material.NETHER_STAR, "<#C4B5FD>Primary: " + display(slots(p.getUniqueId())[0])));
-        inv.setItem(gui.getInt("main.secondary-slot",15), named(Material.AMETHYST_SHARD, "<#A855F7>Secondary: " + display(slots(p.getUniqueId())[1])));
-        inv.setItem(gui.getInt("main.effects-slot",13), named(Material.ENCHANTED_BOOK, "<#C4B5FD>Browse / equip effects"));
-        inv.setItem(gui.getInt("main.close-slot",22), named(Material.BARRIER, "<red>Close"));
-        mainMenu = inv; p.openInventory(inv);
+        p.openInventory(gui.buildMain(p));
     }
     private void openEffects(Player p, int slot) {
-        var gui = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.File(getDataFolder(), "gui.yml"));
-        int size = Math.max(9, Math.min(54, gui.getInt("effects.rows",6)*9));
-        Inventory inv = Bukkit.createInventory(p, size, mini.deserialize(gui.getString("effects.title","<light_purple>Choose an Effect")));
-        ItemStack filler = named(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for(int i=0;i<size;i++) inv.setItem(i,filler);
-        List<Integer> positions = gui.getIntegerList("effects.slots");
-        for(int i=0;i<EFFECTS.size() && i<positions.size();i++) {
-            String effect=EFFECTS.get(i);
-            inv.setItem(positions.get(i), createEffectItem(effect,false));
-        }
-        inv.setItem(gui.getInt("effects.close-slot",49), named(Material.BARRIER,"<red>Close"));
-        inv.setItem(gui.getInt("effects.back-slot",45), named(Material.ARROW,"<yellow>Back"));
-        p.openInventory(inv);
+        p.openInventory(gui.buildEffects());
     }
-    private ItemStack named(Material material, String name) {
+    ItemStack named(Material material, String name) {
         ItemStack item = new ItemStack(material); ItemMeta meta=item.getItemMeta();
         meta.displayName(mini.deserialize(name)); item.setItemMeta(meta); return item;
     }
-    private ItemStack createEffectItem(String effect, boolean augmented) {
+    ItemStack createEffectItem(String effect, boolean augmented) {
         Material material = switch(effect) {
             case "earth" -> Material.MOSS_BLOCK; case "emerald" -> Material.EMERALD; case "ender" -> Material.ENDER_PEARL;
             case "feather" -> Material.FEATHER; case "fire" -> Material.BLAZE_POWDER; case "frost" -> Material.PACKED_ICE;
@@ -198,8 +180,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         meta.getPersistentDataContainer().set(effectKey, PersistentDataType.STRING, effect + (augmented ? ":augmented" : ""));
         item.setItemMeta(meta); return item;
     }
-    private String title(String effect) { return effect.substring(0,1).toUpperCase(Locale.ROOT)+effect.substring(1); }
-    private String display(String effect) { return effect == null || effect.isBlank() ? "None" : title(effect); }
+    String title(String effect) { return effect.substring(0,1).toUpperCase(Locale.ROOT)+effect.substring(1); }
+    String display(String effect) { return effect == null || effect.isBlank() ? "None" : title(effect); }
 
     @EventHandler public void inventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
