@@ -1,6 +1,7 @@
 package com.catadmirer.infuseSMP;
 
 import com.catadmirer.infuseSMP.effects.EffectRegistry;
+import com.catadmirer.infuseSMP.effects.SparkAbilityManager;
 import com.catadmirer.infuseSMP.extraeffects.AugmentationManager;
 import com.catadmirer.infuseSMP.extraeffects.EmeraldEnchantingListener;
 import com.catadmirer.infuseSMP.managers.MessageManager;
@@ -85,6 +86,7 @@ public final class Infuse extends JavaPlugin {
     private final Set<UUID> enderSparkCooldownReset = new HashSet<>();
     private NamespacedKey effectKey;
     private MessageManager messageManager;
+    private SparkAbilityManager sparkAbilityManager;
     private InfuseGui gui;
     private RecipeBookGui recipeGui;
     private WorldGuardRegionManager regionManager;
@@ -96,6 +98,7 @@ public final class Infuse extends JavaPlugin {
         saveResource("messages.yml", false);
         effectKey = new NamespacedKey(this, "effect");
         messageManager = new MessageManager(this, mini);
+        sparkAbilityManager = new SparkAbilityManager(this);
         gui = new InfuseGui(this);
         recipeGui = new RecipeBookGui(this);
         if (Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) regionManager = new WorldGuardRegionManager(this);
@@ -185,6 +188,14 @@ public final class Infuse extends JavaPlugin {
     }
     private void tell(CommandSender sender, String key) { sender.sendMessage(mini.deserialize(message(key))); }
     private String clean(String s) { return s == null ? "" : s.toLowerCase(Locale.ROOT); }
+    public boolean isTrusted(UUID ownerId, UUID targetId) {
+        return trustManager.isTrusted(ownerId, targetId);
+    }
+
+    public void markEnderSparkCooldownReset(UUID playerId) {
+        enderSparkCooldownReset.add(playerId);
+    }
+
     public boolean hasEffect(Player player, String effect) {
         return player != null && !disabled(player) && Arrays.asList(slots(player.getUniqueId())).contains(effect);
     }
@@ -857,7 +868,7 @@ public final class Infuse extends JavaPlugin {
         player.playSound(player.getLocation(), "entity.ender_dragon.shoot", 1.0f, 1.0f);
     }
 
-    private void applyEnderCurse(Player owner, Player target) {
+    public void applyEnderCurse(Player owner, Player target) {
         if (owner.equals(target) || trustManager.isTrusted(owner.getUniqueId(), target.getUniqueId())) return;
         UUID targetId = target.getUniqueId();
         long duration = Math.max(1, getConfig().getLong("effects.ender.curse-duration-seconds", 15)) * 1000L;
@@ -1018,7 +1029,7 @@ public final class Infuse extends JavaPlugin {
         hasteBreakSpeedModifiers.put(id, modifier);
     }
 
-    private void activateHasteSpark(Player player) {
+    public void activateHasteSpark(Player player) {
         UUID id = player.getUniqueId();
         var attackSpeed = player.getAttribute(Attribute.ATTACK_SPEED);
         var breakSpeed = player.getAttribute(Attribute.BLOCK_BREAK_SPEED);
@@ -1210,108 +1221,7 @@ public final class Infuse extends JavaPlugin {
             }
         }, durationTicks);
         p.playSound(p.getLocation(), getConfig().getString("settings.use-sound", "custom.activate"), 1.0f, 1.0f);
-        switch (effect) {
-            case "speed" -> activateSpeedDash(p, durationTicks);
-            case "feather" -> {
-                p.setVelocity(p.getVelocity().setY(0));
-                p.setVelocity(p.getVelocity().setY(getConfig().getDouble("effects.feather.initial-bounce-power", 1.2)));
-                activateFeatherShockwave(p);
-            }
-            case "haste" -> activateHasteSpark(p);
-            case "strength" -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, durationTicks, 1, true, false, true));
-            case "regeneration" -> activateRegenerationSpark(p);
-            case "heart" -> {
-                var attribute = p.getAttribute(Attribute.MAX_HEALTH);
-                if (attribute != null) attribute.setBaseValue(40.0);
-                p.setHealth(Math.min(40.0, p.getHealth() + recentDamageAmount(p.getUniqueId()) * getConfig().getDouble("effects.heart.spark-heal-percentage", 0.2)));
-                Bukkit.getScheduler().runTaskLater(this, () -> {
-                    if (!p.isOnline()) return;
-                    var currentAttribute = p.getAttribute(Attribute.MAX_HEALTH);
-                    double restoredMax = Arrays.asList(slots(p.getUniqueId())).contains("heart") ? 30.0 : 20.0;
-                    if (currentAttribute != null) currentAttribute.setBaseValue(restoredMax);
-                    if (p.getHealth() > restoredMax) p.setHealth(restoredMax);
-                }, durationTicks);
-            }
-            case "invisibility" -> activateInvisibility(p, durationTicks);
-            case "fire" -> {
-                p.setFireTicks(0);
-                p.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, durationTicks, 0, true, false, true));
-                double radius = getConfig().getDouble("effects.fire.launch-radius", 6.0);
-                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(radius, radius, radius)) {
-                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
-                    if (entity instanceof Player target && trustManager.isTrusted(p.getUniqueId(), target.getUniqueId())) continue;
-                    living.setFireTicks(Math.max(living.getFireTicks(), getConfig().getInt("effects.fire.ignite-duration-ticks", 200)));
-                    living.setVelocity(living.getVelocity().setY(Math.max(
-                            getConfig().getDouble("effects.fire.launch-power", 3.0), living.getVelocity().getY())));
-                }
-                int blockRadius = Math.max(1, (int) Math.ceil(getConfig().getDouble("effects.fire.burn-radius", 6.0)));
-                org.bukkit.Location origin = p.getLocation();
-                for (int x = -blockRadius; x <= blockRadius; x++) {
-                    for (int y = -blockRadius; y <= blockRadius; y++) {
-                        for (int z = -blockRadius; z <= blockRadius; z++) {
-                            if (x * x + y * y + z * z > blockRadius * blockRadius) continue;
-                            org.bukkit.block.Block block = origin.getWorld().getBlockAt(
-                                    origin.getBlockX() + x, origin.getBlockY() + y, origin.getBlockZ() + z);
-                            if (block.getType() == Material.WATER || block.getType() == Material.COBWEB) {
-                                block.setType(Material.AIR, false);
-                            } else if (block.getType() == Material.AIR &&
-                                    block.getRelative(org.bukkit.block.BlockFace.DOWN).getType().isSolid() &&
-                                    java.util.concurrent.ThreadLocalRandom.current().nextDouble() < 0.02) {
-                                block.setType(Material.FIRE, false);
-                            }
-                        }
-                    }
-                }
-                p.getWorld().spawnParticle(org.bukkit.Particle.FLAME, p.getLocation().add(0, 1, 0), 40, 2.5, 1.5, 2.5, 0.05);
-                p.playSound(p.getLocation(), "block.lava.extinguish", 1.0f, 0.8f);
-            }
-            case "thunder" -> activateThunderSpark(p);
-            case "ocean" -> {
-                p.setRemainingAir(p.getMaximumAir());
-                p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, durationTicks, 0, true, false, true));
-                activateOceanSpark(p);
-            }
-            case "frost" -> {
-                p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
-                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(8, 5, 8)) {
-                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
-                    if (entity instanceof Player target && trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
-                    living.setFreezeTicks(Math.max(living.getFreezeTicks(), getConfig().getInt("effects.frost.freeze-ticks", 600)));
-                    living.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, durationTicks, 1, true, false, true));
-                }
-            }
-            case "emerald" -> p.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, durationTicks, 4, true, false, true));
-            case "ender" -> {
-                int maxDistance = Math.max(1, getConfig().getInt("effects.ender.teleport-max-radius", 15));
-                org.bukkit.block.Block targetBlock = p.getTargetBlockExact(maxDistance);
-                org.bukkit.Location destination;
-                if (targetBlock != null && targetBlock.getType().isSolid()) {
-                    destination = targetBlock.getLocation().add(0.5, 1, 0.5);
-                } else {
-                    destination = p.getLocation().clone().add(p.getLocation().getDirection().normalize().multiply(maxDistance));
-                }
-                if (destination.getWorld() == p.getWorld() && destination.distanceSquared(p.getLocation()) <= maxDistance * maxDistance + 1) {
-                    org.bukkit.Location safeDestination = destination.clone();
-                    if (!safeDestination.getBlock().isPassable() || !safeDestination.clone().add(0, 1, 0).getBlock().isPassable()) {
-                        safeDestination.setY(safeDestination.getY() + 1);
-                    }
-                    p.teleport(safeDestination);
-                }
-                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(2, 2, 2)) {
-                    if (entity instanceof Player target) {
-                        if (trustManager.isTrusted(p.getUniqueId(), target.getUniqueId())) continue;
-                        applyEnderCurse(p, target);
-                        enderSparkCooldownReset.add(p.getUniqueId());
-                    } else if (entity instanceof org.bukkit.entity.LivingEntity living &&
-                            living.getType() != org.bukkit.entity.EntityType.ENDER_DRAGON &&
-                            living.getType() != org.bukkit.entity.EntityType.WITHER &&
-                            living.getType() != org.bukkit.entity.EntityType.WARDEN) {
-                        living.setHealth(0);
-                    }
-                }
-            }
-            case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
-        }
+        sparkAbilityManager.activate(p, effect, durationTicks);
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
     }
 
@@ -1409,7 +1319,7 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
-    private void activateSpeedDash(Player player, int durationTicks) {
+    public void activateSpeedDash(Player player, int durationTicks) {
         org.bukkit.util.Vector direction = player.getLocation().getDirection().setY(0).normalize();
         if (direction.lengthSquared() < 0.001) direction = new org.bukkit.util.Vector(0, 0, 1);
         final org.bukkit.util.Vector dashDirection = direction.clone();
@@ -1445,7 +1355,7 @@ public final class Infuse extends JavaPlugin {
         }.runTaskTimer(this, 0L, Math.max(1, getConfig().getInt("effects.speed.dash-interval-ticks", 1)));
     }
 
-    private void activateOceanSpark(Player caster) {
+    public void activateOceanSpark(Player caster) {
         int iterations = Math.max(1, getConfig().getInt("effects.ocean.pull-iterations", 50));
         int interval = Math.max(1, getConfig().getInt("effects.ocean.pull-interval-ticks", 2));
         double radius = Math.max(0.1, getConfig().getDouble("effects.ocean.pull-radius", 6.0));
@@ -1468,7 +1378,7 @@ public final class Infuse extends JavaPlugin {
         }, 0L, interval);
     }
 
-    private void activateThunderSpark(Player caster) {
+    public void activateThunderSpark(Player caster) {
         double maximumRadius = 20.0;
         List<org.bukkit.entity.LivingEntity> nearby = new ArrayList<>();
         for (org.bukkit.entity.Entity entity : caster.getNearbyEntities(maximumRadius, maximumRadius, maximumRadius)) {
@@ -1505,7 +1415,7 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
-    private void activateFeatherShockwave(Player player) {
+    public void activateFeatherShockwave(Player player) {
         final int[] ticks = {0};
         final double[] maxFallDistance = {0.0};
         final boolean[] leftGround = {false};
@@ -1536,7 +1446,7 @@ public final class Infuse extends JavaPlugin {
         }, 1L, 1L);
     }
 
-    private void activateRegenerationSpark(Player caster) {
+    public void activateRegenerationSpark(Player caster) {
         int iterations = Math.max(1, getConfig().getInt("effects.regeneration.spark-heal-iteration", 15));
         double totalHealing = recentDamageAmount(caster.getUniqueId()) * getConfig().getDouble("effects.regeneration.spark-heal-percentage", 0.2);
         double healingPerTick = totalHealing / iterations;
@@ -1836,7 +1746,7 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
-    private void activateInvisibility(Player player, int durationTicks) {
+    public void activateInvisibility(Player player, int durationTicks) {
         UUID casterId = player.getUniqueId();
         invisiblePlayers.add(casterId);
         player.setCollidable(false);
@@ -2304,7 +2214,7 @@ public final class Infuse extends JavaPlugin {
         }, windowTicks);
     }
 
-    private double recentDamageAmount(UUID playerId) {
+    public double recentDamageAmount(UUID playerId) {
         Deque<DamageSample> samples = recentDamage.get(playerId);
         if (samples == null || samples.isEmpty()) return 0.0;
         long cutoff = System.currentTimeMillis() - Math.max(1, getConfig().getLong("settings.recent-damage-window-seconds", 30)) * 1000L;
