@@ -1127,6 +1127,10 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                     player.setCollidable(true);
                     for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
                 }
+                if (fireGlidingPlayers.remove(player.getUniqueId())) {
+                    ItemStack chest = player.getInventory().getChestplate();
+                    if (chest == null || chest.getType() != Material.ELYTRA) player.setGliding(false);
+                }
                 continue;
             }
             Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
