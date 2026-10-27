@@ -10,16 +10,50 @@ Requires JDK 21 and Maven:
 mvn --batch-mode clean package
 ```
 
-The plugin JAR is written to `target/Infuse.jar`. GitHub Actions compiles the branch and uploads the JAR as a workflow artifact.
+The JAR is written to `target/Infuse.jar`. GitHub Actions builds the branch and publishes a downloadable workflow artifact.
 
 ## Install
 
-1. Download the `Infuse.jar` build artifact and place it in the server's `plugins` directory.
-2. Start the server once.
-3. Configure `plugins/Infuse/config.yml`, `gui.yml`, and `messages.yml`.
-4. Restart the server or run `/infuse reload`.
+1. Download the latest successful `Infuse-1.0.0` workflow artifact.
+2. Put `Infuse.jar` in the server's `plugins` folder.
+3. Start the server once so the plugin creates its configuration files.
+4. Review `plugins/Infuse/config.yml`, `gui.yml`, and `messages.yml`.
+5. Restart the server after changing settings that affect recipes or resource packs.
 
-The texture-pack prompt is enabled by default and downloads the original pack from the public InfuseS3 repository. The URL and SHA-1 can be changed under `settings.resource-pack`. The pack is externally hosted rather than copied into this repository.
+The original texture pack is currently hosted externally. The configured URL and SHA-1 are in `settings.resource-pack`; they are not bundled in this repository yet.
+
+## Source layout
+
+The Java source follows the package-oriented layout used by the reference project, with one purpose per package:
+
+```text
+src/main/java/com/catadmirer/infuseSMP/
+├── Infuse.java                  # plugin lifecycle and shared effect state
+├── commands/
+│   └── InfuseCommandHandler.java
+├── effects/
+│   └── EffectRegistry.java      # playable effect keys and icon ordering
+├── expansions/
+│   └── InfusePlaceholders.java  # optional PlaceholderAPI expansion
+├── gui/
+│   ├── InfuseGui.java           # main and effect-selection menus
+│   ├── RecipeBookGui.java       # recipe browser
+│   └── CraftingGui.java         # crafting and ritual flow
+├── listeners/
+│   ├── DamageListener.java
+│   ├── EffectItemListener.java
+│   ├── PlayerLifecycleListener.java
+│   └── SparkControlListener.java
+├── managers/
+│   └── MessageManager.java      # cached messages.yml reader
+└── util/
+    ├── regions/
+    │   └── WorldGuardRegionManager.java
+    └── trust/
+        └── TrustManager.java
+```
+
+Configuration stays in `src/main/resources`; GUI layout is deliberately separate in `gui.yml`.
 
 ## Commands
 
@@ -31,16 +65,17 @@ The texture-pack prompt is enabled by default and downloads the original pack fr
 - `/ldrain`, `/rdrain` — return an equipped effect as an item when it is off cooldown.
 - `/recipes` — browse the recipe book.
 - Sneak-right-click a brewing stand to open the crafting GUI.
-- `/trust <add|remove|list|clear> [player]`, `/untrust <player>` — manage effect exemptions.
-- `/infuse add|remove|get|history` — admin effect management, supporting `-p=`, `-e=`, `-s=`, and `-a=` flags.
+- `/trust <add|remove|list|clear> [player]`, `/untrust <player>` — manage trust lists.
+- `/infuse add|remove|get|history` — admin effect management.
 - `/conf <get|set|list>` — view and edit config values (admin).
 - `/mapregion <add|delete|list|clear>` — disable Infuse in WorldGuard regions (WorldGuard required).
-- `/resetcraft <effect|all>` and `/resetcooldown [primary|secondary]` — admin maintenance commands.
-- `/toggledisplay` — toggle the per-player HUD.
+- `/resetcraft <effect|all>`, `/resetcooldown [primary|secondary]`, and `/toggledisplay`.
 
-## PlaceholderAPI
+## Optional integrations
 
-When PlaceholderAPI is installed, the plugin registers the `infuse` expansion. Supported identifiers include:
+### PlaceholderAPI
+
+When installed, the plugin registers the `infuse` expansion. Identifiers include:
 
 - `%infuse_effect_name_primary%`, `%infuse_effect_name_secondary%`
 - `%infuse_effect_icon_primary%`, `%infuse_effect_icon_secondary%`
@@ -50,15 +85,12 @@ When PlaceholderAPI is installed, the plugin registers the `infuse` expansion. S
 - `%infuse_effect_spark_ticks_primary%`, `%infuse_effect_spark_ticks_secondary%`
 - `%infuse_effect_cooldown_ticks_primary%`, `%infuse_effect_cooldown_ticks_secondary%`
 
-## Files
+### WorldGuard
 
-- `config.yml`: worlds, effect colors, cooldowns, craft limits, trust settings, resource pack, and effect tuning.
-- `gui.yml`: main menu, effect selector, and recipe-book layout.
-- `messages.yml`: message strings.
-- Player slots, augmented state, controls, trust lists, display preference, history, and craft counts use YAML persistence.
+Install WorldGuard to use `/mapregion`. Without it, the plugin still supports the disabled-world list in `config.yml`.
 
-## Conversion status
+## Status
 
-The Java branch includes consumable effect potions with the original custom-model-data IDs, primary/secondary slots, cooldown-aware Spark activation, action bindings, trust delays, death drops, configurable GUIs, recipe browsing/crafting, augmented rituals, WorldGuard disabled regions, PlaceholderAPI identifiers, and a substantial subset of the effect-specific passive/combat/Spark mechanics.
+The conversion now has dedicated command, listener, GUI, effect-registry, message, trust, region, and placeholder packages. It implements the main effect items, primary/secondary slots, Spark activation/cooldowns, controls, trust delays, death handling, configurable GUIs, recipe browsing/crafting, augmented rituals, region restrictions, and a subset of effect-specific passive/combat abilities.
 
-This is still an **in-progress conversion, not yet a verified production-equivalent replacement**. Some original per-effect edge cases, exact animation sequences, and the original SkBee region-mapping workflow are not identical yet. The latest Java source must pass CI and be tested on a live 1.21.11 server before production use.
+It remains an **in-progress conversion** rather than a verified feature-for-feature replacement. Some effect edge cases, original animation sequences, and SkBee-specific behavior still need parity testing. Use a test server first and do not treat it as production-equivalent until the remaining parity checks and live-server tests are complete.
