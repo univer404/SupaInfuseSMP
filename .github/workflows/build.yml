@@ -30,8 +30,8 @@ jobs:
           if not enabled or enabled.group(1).lower() != "true":
               print("Resource pack delivery is disabled; skipping validation.")
               raise SystemExit(0)
-          url_match = re.search(r'(?m)^    url:\s*["\']?([^"\'\n]+)', section)
-          sha_match = re.search(r'(?m)^    sha1:\s*["\']?([0-9a-fA-F]{40})', section)
+          url_match = re.search(r'(?m)^    url:\s*"([^"]+)"', section)
+          sha_match = re.search(r'(?m)^    sha1:\s*"([0-9a-fA-F]{40})"', section)
           if not url_match or not sha_match:
               raise SystemExit("Resource pack URL or 40-character SHA-1 is missing.")
           url = url_match.group(1).strip()
