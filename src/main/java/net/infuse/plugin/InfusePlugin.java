@@ -47,6 +47,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         Objects.requireNonNull(getCommand("trust")).setExecutor(this);
         Objects.requireNonNull(getCommand("trust")).setTabCompleter(this);
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(new InfuseCraftingGui(this), this);
         passiveTask = Bukkit.getScheduler().runTaskTimer(this, this::applyPassives, 20L, 20L);
         getLogger().info("Infuse initialized. " + EFFECTS.size() + " effect identifiers registered.");
     }
@@ -97,6 +98,23 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("trust")) return trustCommand(sender, args);
+        if (command.getName().equalsIgnoreCase("use")) {
+            if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
+            String slot = args.length == 0 ? "primary" : args[0].equalsIgnoreCase("p") ? "primary" : args[0].equalsIgnoreCase("s") ? "secondary" : args[0].toLowerCase(Locale.ROOT);
+            if (!slot.equals("primary") && !slot.equals("secondary")) { p.sendMessage("Usage: /use <primary|secondary>"); return true; }
+            spark(p, slot); return true;
+        }
+        if (command.getName().equalsIgnoreCase("swap")) {
+            if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
+            String[] values = slots(p.getUniqueId());
+            String temp = values[0]; values[0] = values[1]; values[1] = temp;
+            saveData(); p.sendMessage(mini.deserialize("<green>Swapped your Infuse effects.")); return true;
+        }
+        if (command.getName().equalsIgnoreCase("recipes")) {
+            if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
+            p.sendMessage(mini.deserialize("<light_purple>Use a sneaking right-click on a brewing stand to open the Infuse crafting menu."));
+            return true;
+        }
         if (args.length == 0 || args[0].equalsIgnoreCase("gui")) {
             if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
             openMain(p); return true;
@@ -254,8 +272,11 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         e.setCancelled(true); spark(e.getPlayer());
     }
     private void spark(Player p) {
+        spark(p, null);
+    }
+    private void spark(Player p, String requestedSlot) {
         String[] s=slots(p.getUniqueId());
-        String effect=!s[1].isBlank()?s[1]:s[0];
+        String effect = requestedSlot == null ? (!s[1].isBlank()?s[1]:s[0]) : s[requestedSlot.equalsIgnoreCase("secondary") ? 1 : 0];
         if(effect.isBlank()) { p.sendMessage(mini.deserialize("<red>You have no Infuse effect equipped.")); return; }
         if(disabled(p)) return;
         long now=System.currentTimeMillis(); String key=p.getUniqueId()+":"+effect;
@@ -313,7 +334,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if(command.getName().equalsIgnoreCase("trust")) return args.length==1?List.of("add","remove","list","clear"):args.length==2?Bukkit.getOnlinePlayers().stream().map(Player::getName).toList():List.of();
-        if(args.length==1) return List.of("gui","give","clear","spark","reload").stream().filter(s->s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
+        if(args.length==1) return List.of("gui","give","clear","spark","reload","add","remove","get","swap","history").stream().filter(s->s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         if(args.length==3 && args[0].equalsIgnoreCase("give")) return EFFECTS;
         return List.of();
     }
