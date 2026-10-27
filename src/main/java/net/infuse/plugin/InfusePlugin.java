@@ -223,12 +223,6 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         } else if (selectedSlot.equals("secondary") || selectedSlot.equals("s")) {
             next[1] = effect; nextAug[1] = isAugmented;
         } else { sender.sendMessage("Slot must be primary, secondary, or both."); return true; }
-        if (!getConfig().getBoolean("settings.allow-same-effects", false) && !next[0].isBlank() && next[0].equals(next[1])) {
-            if (!selectedSlot.equals("both") || !getConfig().getBoolean("settings.allow-same-effects", false)) {
-                sender.sendMessage(mini.deserialize("<red>The same effect cannot be equipped in both slots."));
-                return true;
-            }
-        }
         equipped.put(target.getUniqueId(), next);
         augmented.put(target.getUniqueId(), nextAug);
         saveData();
