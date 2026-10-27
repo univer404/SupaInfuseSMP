@@ -124,6 +124,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private boolean disabled(Player p) { return getConfig().getStringList("settings.disabled-worlds").contains(p.getWorld().getName()); }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("conf")) return configCommand(sender, args);
         if (command.getName().equalsIgnoreCase("item")) return itemCommand(sender, args);
         if (command.getName().equalsIgnoreCase("ldrain") || command.getName().equalsIgnoreCase("pdrain")) return drainEffect(sender, "primary");
         if (command.getName().equalsIgnoreCase("rdrain") || command.getName().equalsIgnoreCase("sdrain")) return drainEffect(sender, "secondary");
@@ -225,6 +226,78 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         List<String> history = historyMap.computeIfAbsent(playerId, ignored -> new ArrayList<>());
         history.add(effect + ":" + isAugmented + ":" + System.currentTimeMillis());
         while (history.size() > 30) history.remove(0);
+    }
+
+    private boolean configCommand(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("infuse.admin")) { tell(sender, "no-permission"); return true; }
+        if (args.length == 0) { sender.sendMessage("/conf <get|set|list> ..."); return true; }
+        String action = args[0].toLowerCase(Locale.ROOT);
+        if (action.equals("list")) {
+            if (args.length < 3) { sender.sendMessage("/conf list <show|add|remove|clear> <primary_effects|secondary_effects> [effect]"); return true; }
+            String listName = args[2].toLowerCase(Locale.ROOT).replace('_', '-');
+            String path = switch (listName) {
+                case "primary-effects" -> "settings.primary-effects";
+                case "secondary-effects" -> "settings.secondary-effects";
+                default -> null;
+            };
+            if (path == null) { sender.sendMessage("Supported lists: primary_effects, secondary_effects"); return true; }
+            List<String> values = new ArrayList<>(getConfig().getStringList(path));
+            switch (args[1].toLowerCase(Locale.ROOT)) {
+                case "show" -> sender.sendMessage(path + " = " + values);
+                case "add" -> {
+                    if (args.length < 4) { sender.sendMessage("Specify a value to add."); return true; }
+                    String value = clean(args[3]);
+                    if (!EFFECTS.contains(value)) { tell(sender, "unknown-effect"); return true; }
+                    if (!values.contains(value)) values.add(value);
+                    getConfig().set(path, values); saveConfig(); sender.sendMessage("Updated " + path + ": " + values);
+                }
+                case "remove" -> {
+                    if (args.length < 4) { sender.sendMessage("Specify a value to remove."); return true; }
+                    values.remove(clean(args[3])); getConfig().set(path, values); saveConfig(); sender.sendMessage("Updated " + path + ": " + values);
+                }
+                case "clear" -> { values.clear(); getConfig().set(path, values); saveConfig(); sender.sendMessage("Cleared " + path); }
+                default -> sender.sendMessage("/conf list <show|add|remove|clear> <primary_effects|secondary_effects> [effect]");
+            }
+            return true;
+        }
+        if (!action.equals("get") && !action.equals("set")) { sender.sendMessage("/conf <get|set|list> ..."); return true; }
+        if (args.length < (action.equals("get") ? 2 : 3)) { sender.sendMessage("/conf get <key> | /conf get <effect> <key> | /conf set <key> <value> | /conf set <effect> <key> <value>"); return true; }
+        String path;
+        String value = null;
+        if (action.equals("get")) {
+            path = args.length >= 3 ? "effects." + clean(args[1]) + "." + normalizeKey(args[2]) : normalizeConfigPath(args[1]);
+        } else if (args.length >= 4 && EFFECTS.contains(clean(args[1])) && !args[1].contains(".")) {
+            path = "effects." + clean(args[1]) + "." + normalizeKey(args[2]);
+            value = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+        } else {
+            path = normalizeConfigPath(args[1]);
+            value = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+        }
+        if (action.equals("get")) {
+            sender.sendMessage(mini.deserialize("<yellow>" + path + " <gray>= <white>" + String.valueOf(getConfig().get(path, "<unset>"))));
+            return true;
+        }
+        Object parsed = parseConfigValue(value);
+        getConfig().set(path, parsed);
+        saveConfig();
+        sender.sendMessage(mini.deserialize("<green>Updated <white>" + path + "<green> to <white>" + parsed));
+        return true;
+    }
+
+    private String normalizeKey(String key) { return key.toLowerCase(Locale.ROOT).replace('_', '-'); }
+
+    private String normalizeConfigPath(String key) {
+        String normalized = key.toLowerCase(Locale.ROOT).replace('_', '-');
+        if (normalized.startsWith("settings.") || normalized.startsWith("effects.") || normalized.startsWith("crafting.")) return normalized;
+        return "settings." + normalized;
+    }
+
+    private Object parseConfigValue(String value) {
+        if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) return Boolean.parseBoolean(value);
+        try { return Integer.parseInt(value); } catch (NumberFormatException ignored) {}
+        try { return Double.parseDouble(value); } catch (NumberFormatException ignored) {}
+        if (value.contains(",")) return Arrays.stream(value.split(",")).map(String::trim).filter(part -> !part.isEmpty()).toList();
+        return value;
     }
 
     private boolean itemCommand(CommandSender sender, String[] args) {
@@ -1035,6 +1108,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
     }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (command.getName().equalsIgnoreCase("conf")) return args.length == 1 ? List.of("get", "set", "list") : args.length == 2 && args[0].equalsIgnoreCase("list") ? List.of("show", "add", "remove", "clear") : List.of();
         if (command.getName().equalsIgnoreCase("item")) return args.length == 1 ? EFFECTS.stream().filter(value -> value.startsWith(args[0].toLowerCase(Locale.ROOT))).toList() : List.of("true", "false");
         if (command.getName().equalsIgnoreCase("trust")) return args.length == 1 ? List.of("add", "remove", "list", "clear") : args.length == 2 ? Bukkit.getOnlinePlayers().stream().map(Player::getName).toList() : List.of();
         if (command.getName().equalsIgnoreCase("control")) return args.length == 1 ? List.of("primary", "secondary") : args.length == 2 ? List.of("swap", "drop", "sneak", "sneak-drop", "sneak-swap", "none") : List.of();
