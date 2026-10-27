@@ -28,7 +28,7 @@ import java.util.*;
 public final class CraftingGui implements Listener {
     private static final int[] INPUT_SLOTS = {12, 13, 14, 21, 22, 23, 30, 31, 32};
     private static final List<String> EFFECT_ORDER = List.of("emerald", "feather", "fire", "frost", "haste", "heart", "invisibility", "ocean", "regeneration", "speed", "strength", "thunder", "ender");
-    static final Map<String, List<String>> RECIPES = recipes();
+    public static final Map<String, List<String>> RECIPES = recipes();
     private final Infuse plugin;
     private final Map<UUID, Inventory> openMenus = new HashMap<>();
     private final Map<UUID, Location> brewingStands = new HashMap<>();
