@@ -204,10 +204,15 @@ effects:
     augment-limit: 0
   ender:
     color: "#7A42AA"
-    cooldown-seconds: 60
-    spark-seconds: 15
+    cooldown-seconds: 30
+    spark-seconds: 1
     craft-limit: 1
     augment-limit: 1
+    untrust-glow-radius: 5.0
+    dragon-fireball-speed: 2.0
+    dragon-fireball-cooldown-seconds: 10
+    curse-duration-seconds: 15
+    teleport-max-radius: 15
 
 
 crafting:
