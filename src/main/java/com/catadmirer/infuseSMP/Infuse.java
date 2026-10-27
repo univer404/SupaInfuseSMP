@@ -10,7 +10,6 @@ import com.catadmirer.infuseSMP.gui.CraftingGui;
 import com.catadmirer.infuseSMP.gui.InfuseGui;
 import com.catadmirer.infuseSMP.gui.RecipeBookGui;
 import com.catadmirer.infuseSMP.util.regions.RegionManager;
-import com.catadmirer.infuseSMP.expansions.InfusePlaceholders;
 import com.catadmirer.infuseSMP.commands.InfuseCommandHandler;
 import com.catadmirer.infuseSMP.listeners.DamageListener;
 import com.catadmirer.infuseSMP.listeners.EffectItemListener;
@@ -111,8 +110,14 @@ public final class Infuse extends JavaPlugin {
         }
         loadData();
         if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            new InfusePlaceholders(this).register();
-            getLogger().info("PlaceholderAPI expansion registered.");
+            try {
+                Class<?> expansionType = Class.forName("com.catadmirer.infuseSMP.expansions.InfusePlaceholders");
+                Object expansion = expansionType.getConstructor(Infuse.class).newInstance(this);
+                expansionType.getMethod("register").invoke(expansion);
+                getLogger().info("PlaceholderAPI expansion registered.");
+            } catch (ReflectiveOperationException | LinkageError exception) {
+                getLogger().warning("PlaceholderAPI expansion could not be loaded: " + exception.getMessage());
+            }
         }
         InfuseCommandHandler commandHandler = new InfuseCommandHandler(this);
         for (String commandName : List.of("infuse", "trust", "use", "swap", "recipes", "control", "item",
