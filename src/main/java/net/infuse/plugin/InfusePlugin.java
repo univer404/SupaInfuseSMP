@@ -1244,7 +1244,10 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             }
             if (active.contains("emerald")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, 40, 2, true, false, true));
-                applyToolEnchant(player.getInventory().getItemInMainHand(), enchantment("looting"), 5);
+                ItemStack weapon = player.getInventory().getItemInMainHand();
+                if (weapon != null && (weapon.getType().name().endsWith("_SWORD") || weapon.getType().name().endsWith("_AXE"))) {
+                    applyToolEnchant(weapon, enchantment("looting"), 5);
+                }
             }
             if (active.contains("ocean")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, 40, 0, true, false, true));
