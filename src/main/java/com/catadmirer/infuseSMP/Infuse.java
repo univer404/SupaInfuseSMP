@@ -1068,7 +1068,7 @@ public final class Infuse extends JavaPlugin {
                     if (entity instanceof Player target && trustManager.isTrusted(p.getUniqueId(), target.getUniqueId())) continue;
                     living.setFireTicks(Math.max(living.getFireTicks(), getConfig().getInt("effects.fire.ignite-duration-ticks", 200)));
                     living.setVelocity(living.getVelocity().setY(Math.max(
-                            getConfig().getDouble("effects.fire.launch-power", 3.0) * 0.25, living.getVelocity().getY())));
+                            getConfig().getDouble("effects.fire.launch-power", 3.0), living.getVelocity().getY())));
                 }
                 int blockRadius = Math.max(1, (int) Math.ceil(getConfig().getDouble("effects.fire.burn-radius", 6.0)));
                 org.bukkit.Location origin = p.getLocation();
