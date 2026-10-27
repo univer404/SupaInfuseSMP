@@ -2050,11 +2050,13 @@ public final class Infuse extends JavaPlugin {
         Player player = event.getPlayer();
         clearHasteStack(player);
         clearSpeedStack(player);
+        updateFrostModifiers(player, false);
         invisiblePlayers.remove(player.getUniqueId());
         fireGlidingPlayers.remove(player.getUniqueId());
         oceanAir.remove(player.getUniqueId());
         oceanLastActive.remove(player.getUniqueId());
         recentDamage.remove(player.getUniqueId());
+        windCharges.remove(player.getUniqueId());
         windChargeCooldowns.remove(player.getUniqueId());
         enderCurses.remove(player.getUniqueId());
         regenFoodWindow.remove(player.getUniqueId());
