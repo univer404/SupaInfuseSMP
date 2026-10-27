@@ -31,6 +31,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<UUID, Set<UUID>> trusted = new HashMap<>();
     private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
+    private final Map<String, Integer> hitCounters = new HashMap<>();
     private NamespacedKey effectKey;
     private InfuseGui gui;
     private BukkitTask passiveTask;
@@ -352,11 +353,49 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             event.setCancelled(true);
         }
     }
-    @EventHandler public void damage(EntityDamageByEntityEvent e) {
-        if(!(e.getDamager() instanceof Player attacker)) return;
-        String[] s=slots(attacker.getUniqueId());
-        if(Arrays.asList(s).contains("strength")) e.setDamage(e.getDamage()*1.2);
-        if(e.getEntity() instanceof Player victim && trusted.getOrDefault(attacker.getUniqueId(),Set.of()).contains(victim.getUniqueId())) e.setCancelled(true);
+    @EventHandler public void damage(EntityDamageByEntityEvent event) {
+        if (!(event.getDamager() instanceof Player attacker)) return;
+        if (!(event.getEntity() instanceof org.bukkit.entity.LivingEntity target)) return;
+        if (target instanceof Player victim && trusted.getOrDefault(attacker.getUniqueId(), Set.of()).contains(victim.getUniqueId())) {
+            event.setCancelled(true);
+            return;
+        }
+        String[] activeSlots = slots(attacker.getUniqueId());
+        Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
+        active.remove("");
+        if (active.contains("strength")) {
+            double multiplier = target instanceof Player ? 1.2 : getConfig().getDouble("effects.strength.mob-damage-multiplier", 2.0);
+            event.setDamage(event.getDamage() * multiplier);
+        }
+        if (active.contains("fire") && countHit(attacker, "fire") % getConfig().getInt("effects.fire.trigger-hits", 5) == 0) {
+            target.setFireTicks(Math.max(target.getFireTicks(), getConfig().getInt("effects.fire.ignite-ticks", 100)));
+        }
+        if (active.contains("thunder")) {
+            int threshold = getConfig().getInt("effects.thunder.trigger-hits", 10);
+            if (attacker.getWorld().hasStorm() && attacker.getWorld().isThundering()) threshold = Math.max(1, threshold / 2);
+            if (countHit(attacker, "thunder") % threshold == 0) {
+                attacker.getWorld().strikeLightningEffect(target.getLocation());
+                if (getConfig().getBoolean("settings.allow-true-damage", true)) target.damage(getConfig().getDouble("effects.thunder.true-damage", 1.0), attacker);
+            }
+        }
+        if (active.contains("frost") && countHit(attacker, "frost") % getConfig().getInt("effects.frost.trigger-hits", 10) == 0) {
+            target.setFreezeTicks(Math.max(target.getFreezeTicks(), getConfig().getInt("effects.frost.freeze-ticks", 600)));
+            target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, 200, 1, true, false, true));
+        }
+        if (active.contains("invisibility") && countHit(attacker, "invisibility") % getConfig().getInt("effects.invisibility.trigger-hits", 10) == 0) {
+            target.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 200, 0, true, false, true));
+        }
+        if (active.contains("regeneration")) attacker.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 60, 1, true, false, true));
+        if (active.contains("emerald") && target instanceof Player) {
+            attacker.giveExp(getConfig().getInt("effects.emerald.xp-gain-per-hit", 1));
+        }
+    }
+
+    private int countHit(Player player, String effect) {
+        String key = player.getUniqueId() + ":" + effect;
+        int count = hitCounters.getOrDefault(key, 0) + 1;
+        hitCounters.put(key, count);
+        return count;
     }
     @EventHandler public void join(PlayerJoinEvent e) {
         slots(e.getPlayer().getUniqueId());
