@@ -1062,12 +1062,34 @@ public final class Infuse extends JavaPlugin {
             case "fire" -> {
                 p.setFireTicks(0);
                 p.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, durationTicks, 0, true, false, true));
-                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(6, 4, 6)) {
+                double radius = getConfig().getDouble("effects.fire.launch-radius", 6.0);
+                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(radius, radius, radius)) {
                     if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
-                    if (entity instanceof Player target && trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
-                    living.setFireTicks(Math.max(living.getFireTicks(), getConfig().getInt("effects.fire.ignite-ticks", 100)));
-                    living.setVelocity(living.getVelocity().setY(Math.max(0.7, living.getVelocity().getY())));
+                    if (entity instanceof Player target && trustManager.isTrusted(p.getUniqueId(), target.getUniqueId())) continue;
+                    living.setFireTicks(Math.max(living.getFireTicks(), getConfig().getInt("effects.fire.ignite-duration-ticks", 200)));
+                    living.setVelocity(living.getVelocity().setY(Math.max(
+                            getConfig().getDouble("effects.fire.launch-power", 3.0) * 0.25, living.getVelocity().getY())));
                 }
+                int blockRadius = Math.max(1, (int) Math.ceil(getConfig().getDouble("effects.fire.burn-radius", 6.0)));
+                org.bukkit.Location origin = p.getLocation();
+                for (int x = -blockRadius; x <= blockRadius; x++) {
+                    for (int y = -blockRadius; y <= blockRadius; y++) {
+                        for (int z = -blockRadius; z <= blockRadius; z++) {
+                            if (x * x + y * y + z * z > blockRadius * blockRadius) continue;
+                            org.bukkit.block.Block block = origin.getWorld().getBlockAt(
+                                    origin.getBlockX() + x, origin.getBlockY() + y, origin.getBlockZ() + z);
+                            if (block.getType() == Material.WATER || block.getType() == Material.COBWEB) {
+                                block.setType(Material.AIR, false);
+                            } else if (block.getType() == Material.AIR &&
+                                    block.getRelative(org.bukkit.block.BlockFace.DOWN).getType().isSolid() &&
+                                    java.util.concurrent.ThreadLocalRandom.current().nextDouble() < 0.02) {
+                                block.setType(Material.FIRE, false);
+                            }
+                        }
+                    }
+                }
+                p.getWorld().spawnParticle(org.bukkit.Particle.FLAME, p.getLocation().add(0, 1, 0), 40, 2.5, 1.5, 2.5, 0.05);
+                p.playSound(p.getLocation(), "block.lava.extinguish", 1.0f, 0.8f);
             }
             case "thunder" -> {
                 int strikes = 0;
@@ -1287,6 +1309,21 @@ public final class Infuse extends JavaPlugin {
         return "<" + color + ">" + (index == 0 ? "P" : "S") + ": " + title(effect) + " <dark_gray>[" + status + "<dark_gray>]";
     }
 
+    private void extinguishNearbyWater(Player player) {
+        int radius = Math.max(1, (int) Math.ceil(getConfig().getDouble("effects.fire.burn-radius", 6.0)));
+        org.bukkit.Location origin = player.getLocation();
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -radius; y <= radius; y++) {
+                for (int z = -radius; z <= radius; z++) {
+                    if (x * x + y * y + z * z > radius * radius) continue;
+                    org.bukkit.block.Block block = origin.getWorld().getBlockAt(
+                            origin.getBlockX() + x, origin.getBlockY() + y, origin.getBlockZ() + z);
+                    if (block.getType() == Material.WATER) block.setType(Material.AIR, false);
+                }
+            }
+        }
+    }
+
     private void updateFrostModifiers(Player player, boolean onIceOrSnow) {
         UUID id = player.getUniqueId();
         var movement = player.getAttribute(Attribute.MOVEMENT_SPEED);
@@ -1451,12 +1488,13 @@ public final class Infuse extends JavaPlugin {
                 if (player.getLocation().getBlock().getType() == Material.LAVA && player.isSneaking()) {
                     fireGlidingPlayers.add(player.getUniqueId());
                     player.setGliding(true);
-                    org.bukkit.util.Vector swim = player.getLocation().getDirection().multiply(getConfig().getDouble("effects.fire.swim-power", 0.5));
+                    org.bukkit.util.Vector swim = player.getLocation().getDirection().multiply(getConfig().getDouble("effects.fire.swim-power", 0.4));
                     player.setVelocity(swim.setY(player.getVelocity().getY()));
                 } else if (fireGlidingPlayers.remove(player.getUniqueId())) {
                     ItemStack chest = player.getInventory().getChestplate();
                     if (chest == null || chest.getType() != Material.ELYTRA) player.setGliding(false);
                 }
+                if (player.getFireTicks() > 0) extinguishNearbyWater(player);
             }
             if (active.contains("emerald")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.HERO_OF_THE_VILLAGE, 40, 2, true, false, true));
