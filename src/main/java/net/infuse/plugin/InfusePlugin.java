@@ -84,6 +84,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         saveConfig();
     }
 
+    net.kyori.adventure.text.minimessage.MiniMessage getMiniMessage() { return mini; }
+
     private String message(String key) {
         var cfg = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.File(getDataFolder(), "messages.yml"));
         return cfg.getString("prefix", "<#A855F7>Infuse » ") + cfg.getString(key, "<red>Missing message: " + key);
