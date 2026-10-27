@@ -644,8 +644,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             String[] parts = encoded.split(":");
             if (!parts[0].equals(effect) || (parts.length > 1 && parts[1].equalsIgnoreCase("augmented")) != isAugmented) continue;
             if (item.getAmount() > 1) item.setAmount(item.getAmount() - 1);
-            else contents[slot] = null;
-            player.getInventory().setContents(contents);
+            else player.getInventory().setItem(slot, null);
             return true;
         }
         return false;
