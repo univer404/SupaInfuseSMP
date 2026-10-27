@@ -212,7 +212,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             player.sendMessage(mini.deserialize("<red>You don't have an effect in your " + slot + " slot."));
             return true;
         }
-        if (cooldowns.getOrDefault(player.getUniqueId() + ":" + effect, 0L) > System.currentTimeMillis()) {
+        String cooldownKey = player.getUniqueId() + ":" + effect;
+        if (sparkEnds.getOrDefault(cooldownKey, 0L) > System.currentTimeMillis() || cooldowns.getOrDefault(cooldownKey, 0L) > System.currentTimeMillis()) {
             player.sendMessage(mini.deserialize("<red>You cannot remove this effect while it is active or on cooldown."));
             return true;
         }
@@ -746,8 +747,10 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             return false;
         }
         if (!current[target].isBlank()) {
-            long activeUntil = cooldowns.getOrDefault(player.getUniqueId() + ":" + current[target], 0L);
-            if (activeUntil > System.currentTimeMillis()) {
+            String currentKey = player.getUniqueId() + ":" + current[target];
+            long activeUntil = sparkEnds.getOrDefault(currentKey, 0L);
+            long cooldownUntil = cooldowns.getOrDefault(currentKey, 0L);
+            if (activeUntil > System.currentTimeMillis() || cooldownUntil > System.currentTimeMillis()) {
                 player.sendMessage(mini.deserialize("<red>You cannot replace that effect until its cycle finishes."));
                 return false;
             }
@@ -824,13 +827,28 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         String effect = requestedSlot == null ? (!s[1].isBlank()?s[1]:s[0]) : s[requestedSlot.equalsIgnoreCase("secondary") ? 1 : 0];
         if(effect.isBlank()) { p.sendMessage(mini.deserialize("<red>You have no Infuse effect equipped.")); return; }
         if(disabled(p)) return;
-        long now=System.currentTimeMillis(); String key=p.getUniqueId()+":"+effect;
-        long until=cooldowns.getOrDefault(key,0L);
-        if(until>now) { p.sendMessage(mini.deserialize("<red>That Spark is on cooldown for "+((until-now+999)/1000)+"s.")); return; }
+        long now = System.currentTimeMillis();
+        String key = p.getUniqueId() + ":" + effect;
+        long activeUntil = sparkEnds.getOrDefault(key, 0L);
+        long cooldownUntil = cooldowns.getOrDefault(key, 0L);
+        if (activeUntil > now) {
+            p.sendMessage(mini.deserialize("<red>That Spark is already active for " + ((activeUntil - now + 999) / 1000) + "s."));
+            return;
+        }
+        if (cooldownUntil > now) {
+            p.sendMessage(mini.deserialize("<red>That Spark is on cooldown for " + ((cooldownUntil - now + 999) / 1000) + "s."));
+            return;
+        }
         long cooldownSeconds = Math.max(0, getConfig().getLong("effects." + effect + ".cooldown-seconds", 60));
         int durationTicks = (int) Math.max(1, getConfig().getLong("effects." + effect + ".spark-seconds", 15) * 20L);
-        cooldowns.put(key, now + cooldownSeconds * 1000L);
+        cooldowns.remove(key);
         sparkEnds.put(key, now + durationTicks * 50L);
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (sparkEnds.getOrDefault(key, 0L) <= System.currentTimeMillis()) {
+                sparkEnds.remove(key);
+                cooldowns.put(key, System.currentTimeMillis() + cooldownSeconds * 1000L);
+            }
+        }, durationTicks);
         p.playSound(p.getLocation(), getConfig().getString("settings.use-sound", "custom.activate"), 1.0f, 1.0f);
         switch (effect) {
             case "speed" -> {
