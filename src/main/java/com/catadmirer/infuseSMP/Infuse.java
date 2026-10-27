@@ -1,20 +1,20 @@
-package com.catadmirer.infuseSMP;
+package com.supainfuse.smp;
 
-import com.catadmirer.infuseSMP.effects.EffectRegistry;
-import com.catadmirer.infuseSMP.effects.SparkAbilityManager;
-import com.catadmirer.infuseSMP.extraeffects.AugmentationManager;
-import com.catadmirer.infuseSMP.extraeffects.EmeraldEnchantingListener;
-import com.catadmirer.infuseSMP.managers.MessageManager;
-import com.catadmirer.infuseSMP.util.trust.TrustManager;
-import com.catadmirer.infuseSMP.gui.CraftingGui;
-import com.catadmirer.infuseSMP.gui.InfuseGui;
-import com.catadmirer.infuseSMP.gui.RecipeBookGui;
-import com.catadmirer.infuseSMP.util.regions.RegionManager;
-import com.catadmirer.infuseSMP.commands.InfuseCommandHandler;
-import com.catadmirer.infuseSMP.listeners.DamageListener;
-import com.catadmirer.infuseSMP.listeners.EffectItemListener;
-import com.catadmirer.infuseSMP.listeners.PlayerLifecycleListener;
-import com.catadmirer.infuseSMP.listeners.SparkControlListener;
+import com.supainfuse.smp.effects.EffectRegistry;
+import com.supainfuse.smp.effects.SparkAbilityManager;
+import com.supainfuse.smp.extraeffects.AugmentationManager;
+import com.supainfuse.smp.extraeffects.EmeraldEnchantingListener;
+import com.supainfuse.smp.managers.MessageManager;
+import com.supainfuse.smp.util.trust.TrustManager;
+import com.supainfuse.smp.gui.CraftingGui;
+import com.supainfuse.smp.gui.InfuseGui;
+import com.supainfuse.smp.gui.RecipeBookGui;
+import com.supainfuse.smp.util.regions.RegionManager;
+import com.supainfuse.smp.commands.InfuseCommandHandler;
+import com.supainfuse.smp.listeners.DamageListener;
+import com.supainfuse.smp.listeners.EffectItemListener;
+import com.supainfuse.smp.listeners.PlayerLifecycleListener;
+import com.supainfuse.smp.listeners.SparkControlListener;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -102,7 +102,7 @@ public final class Infuse extends JavaPlugin {
         recipeGui = new RecipeBookGui(this);
         if (Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) {
             try {
-                Class<?> implementation = Class.forName("com.catadmirer.infuseSMP.util.regions.WorldGuardRegionManager");
+                Class<?> implementation = Class.forName("com.supainfuse.smp.util.regions.WorldGuardRegionManager");
                 regionManager = (RegionManager) implementation.getConstructor(Infuse.class).newInstance(this);
             } catch (ReflectiveOperationException | LinkageError exception) {
                 getLogger().warning("WorldGuard integration could not be loaded: " + exception.getMessage());
@@ -111,7 +111,7 @@ public final class Infuse extends JavaPlugin {
         loadData();
         if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             try {
-                Class<?> expansionType = Class.forName("com.catadmirer.infuseSMP.expansions.InfusePlaceholders");
+                Class<?> expansionType = Class.forName("com.supainfuse.smp.expansions.InfusePlaceholders");
                 Object expansion = expansionType.getConstructor(Infuse.class).newInstance(this);
                 expansionType.getMethod("register").invoke(expansion);
                 getLogger().info("PlaceholderAPI expansion registered.");
