@@ -806,12 +806,30 @@ public final class Infuse extends JavaPlugin {
         if (Arrays.asList(slots(player.getUniqueId())).contains("ocean") &&
                 event.getHitEntity() instanceof org.bukkit.entity.LivingEntity target &&
                 !(target instanceof Player trustedTarget && trustManager.isTrusted(player.getUniqueId(), trustedTarget.getUniqueId()))) {
-            org.bukkit.util.Vector direction = player.getLocation().toVector().subtract(target.getLocation().toVector()).normalize();
-            double distance = player.getLocation().distance(target.getLocation());
-            double pull = Math.min(getConfig().getDouble("effects.ocean.trident-pull-cap", 16.0),
-                    distance * getConfig().getDouble("effects.ocean.trident-pull-coefficient", 0.27)
-                            + getConfig().getDouble("effects.ocean.trident-pull-offset", 1.5));
-            target.setVelocity(target.getVelocity().add(direction.multiply(pull / 10.0)));
+            String pullKey = player.getUniqueId() + ":ocean-trident";
+            long now = System.currentTimeMillis();
+            if (cooldowns.getOrDefault(pullKey, 0L) <= now) {
+                double distance = player.getLocation().distance(target.getLocation());
+                double pull = (Math.min(getConfig().getDouble("effects.ocean.trident-pull-cap", 16.0), distance)
+                        - getConfig().getDouble("effects.ocean.trident-pull-offset", 1.5))
+                        * getConfig().getDouble("effects.ocean.trident-pull-coefficient", 0.27);
+                if (pull > 0) {
+                    cooldowns.put(pullKey, now + Math.max(0, getConfig().getLong("effects.ocean.trident-pull-cooldown-seconds", 5)) * 1000L);
+                    player.setCooldown(Material.TRIDENT, Math.max(1, (int) (getConfig().getLong("effects.ocean.trident-pull-cooldown-seconds", 5) * 20L)));
+                    target.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                    Bukkit.getScheduler().runTaskLater(this, () -> {
+                        if (!target.isValid() || target.isDead()) return;
+                        org.bukkit.util.Vector direction = player.getLocation().toVector().subtract(target.getLocation().toVector());
+                        if (direction.lengthSquared() > 0.001) {
+                            target.setVelocity(new org.bukkit.util.Vector(0, 0.2, 0).add(direction.normalize().multiply(pull)));
+                        }
+                        target.getWorld().spawnParticle(org.bukkit.Particle.BUBBLE,
+                                target.getLocation().add(0, 1, 0), 8, 0.3, 0.5, 0.3, 0.02);
+                        target.getWorld().playSound(target.getLocation(), "block.bubble_column.upwards_inside", 1.0f, 1.0f);
+                        player.playSound(player.getLocation(), "block.bubble_column.upwards_inside", 1.0f, 1.0f);
+                    }, 1L);
+                }
+            }
         }
     }
 
@@ -1657,7 +1675,7 @@ public final class Infuse extends JavaPlugin {
         if (!overwrite && item.containsEnchantment(enchantment)) return;
         if (item.getType().name().endsWith("_SWORD") || item.getType().name().endsWith("_AXE") ||
                 item.getType().name().endsWith("_PICKAXE") || item.getType().name().endsWith("_SHOVEL") ||
-                item.getType().name().endsWith("_HOE") || item.getType() == Material.SHEARS) {
+                item.getType().name().endsWith("_HOE") || item.getType() == Material.SHEARS || item.getType() == Material.TRIDENT) {
             item.addUnsafeEnchantment(enchantment, level);
         }
     }
@@ -1814,6 +1832,8 @@ public final class Infuse extends JavaPlugin {
                 if (player.isInWater()) player.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, 40, 0, true, false, true));
                 ItemStack heldItem = player.getInventory().getItemInMainHand();
                 if (heldItem.getType() == Material.TRIDENT) applyToolEnchant(heldItem, enchantment("loyalty"), 5);
+                ItemStack offhandItem = player.getInventory().getItemInOffHand();
+                if (offhandItem.getType() == Material.TRIDENT) applyToolEnchant(offhandItem, enchantment("loyalty"), 5);
             }
             if (active.contains("frost")) {
                 player.setFreezeTicks(0);
