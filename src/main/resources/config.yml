@@ -23,6 +23,7 @@ effects:
     spark-seconds: 10
     craft-limit: -1
     augment-limit: 0
+    xp-gain-per-hit: 1
   feather:
     color: "#BEA3CA"
     cooldown-seconds: 60
@@ -35,12 +36,16 @@ effects:
     spark-seconds: 4
     craft-limit: -1
     augment-limit: 0
+    trigger-hits: 5
+    ignite-ticks: 100
   frost:
     color: "#7AE3FC"
     cooldown-seconds: 60
     spark-seconds: 15
     craft-limit: -1
     augment-limit: 0
+    trigger-hits: 10
+    freeze-ticks: 600
   haste:
     color: "#B96C00"
     cooldown-seconds: 60
@@ -59,6 +64,7 @@ effects:
     spark-seconds: 15
     craft-limit: -1
     augment-limit: 0
+    trigger-hits: 10
   ocean:
     color: "#005AFC"
     cooldown-seconds: 60
@@ -83,12 +89,15 @@ effects:
     spark-seconds: 15
     craft-limit: -1
     augment-limit: 0
+    mob-damage-multiplier: 2.0
   thunder:
     color: "#FCED00"
     cooldown-seconds: 90
     spark-seconds: 10
     craft-limit: -1
     augment-limit: 0
+    trigger-hits: 10
+    true-damage: 1.0
   earth:
     color: "#8A795D"
     cooldown-seconds: 60
@@ -102,22 +111,6 @@ effects:
     craft-limit: 1
     augment-limit: 1
 
-# Advanced mechanics ported from the original Skript defaults.
-effects:
-  fire:
-    trigger-hits: 5
-    ignite-ticks: 100
-  frost:
-    trigger-hits: 10
-    freeze-ticks: 600
-  thunder:
-    trigger-hits: 10
-    true-damage: 1.0
-  invisibility:
-    trigger-hits: 10
-  emerald:
-    xp-gain-per-hit: 1
-  strength:
-    mob-damage-multiplier: 2.0
+
 crafting:
   crafted: {}
