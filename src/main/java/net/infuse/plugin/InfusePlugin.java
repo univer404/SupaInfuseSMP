@@ -34,6 +34,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> hitCounters = new HashMap<>();
+    private final Map<String, Long> sparkEnds = new HashMap<>();
     private final Map<UUID, Long> trustActionCooldowns = new HashMap<>();
     private final Set<UUID> invisiblePlayers = new HashSet<>();
     private NamespacedKey effectKey;
@@ -415,13 +416,44 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @EventHandler
     public void onEffectPotionConsume(org.bukkit.event.player.PlayerItemConsumeEvent event) {
+        Player player = event.getPlayer();
         ItemStack item = event.getItem();
         if (item == null || !item.hasItemMeta()) return;
         String encoded = item.getItemMeta().getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
-        if (encoded == null) return;
+        if (encoded == null) {
+            String[] activeSlots = slots(player.getUniqueId());
+            if (Arrays.asList(activeSlots).contains("heart")) {
+                boolean goldenApple = item.getType() == Material.ENCHANTED_GOLDEN_APPLE;
+                int amplifier = Math.max(0, getConfig().getInt(goldenApple ? "effects.heart.egap-absorption-tier" : "effects.heart.food-absorption-tier", goldenApple ? 4 : 0));
+                int duration = getConfig().getInt("effects.heart.food-absorption-duration-ticks", 1200);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, duration, amplifier, true, false, true));
+            }
+            if (Arrays.asList(activeSlots).contains("emerald")) {
+                String key = player.getUniqueId() + ":emerald";
+                boolean sparkActive = sparkEnds.getOrDefault(key, 0L) > System.currentTimeMillis();
+                double chance = getConfig().getDouble(sparkActive ? "effects.emerald.spark-no-consume-chance" : "effects.emerald.no-consume-chance", sparkActive ? 0.75 : 0.5);
+                if (java.util.concurrent.ThreadLocalRandom.current().nextDouble() < chance) {
+                    ItemStack refund = item.clone();
+                    Bukkit.getScheduler().runTaskLater(this, () -> {
+                        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(refund);
+                        leftovers.values().forEach(left -> player.getWorld().dropItemNaturally(player.getLocation(), left));
+                        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_YES, 1.0f, 1.0f);
+                    }, 1L);
+                }
+            }
+            return;
+        }
         event.setCancelled(true);
         String[] parts = encoded.split(":");
-        equipEffect(event.getPlayer(), parts[0], parts.length > 1 && parts[1].equalsIgnoreCase("augmented"), true);
+        equipEffect(player, parts[0], parts.length > 1 && parts[1].equalsIgnoreCase("augmented"), true);
+    }
+
+    @EventHandler
+    public void onExperienceGain(org.bukkit.event.player.PlayerExpChangeEvent event) {
+        String[] activeSlots = slots(event.getPlayer().getUniqueId());
+        if (!Arrays.asList(activeSlots).contains("emerald")) return;
+        int multiplier = sparkEnds.getOrDefault(event.getPlayer().getUniqueId() + ":emerald", 0L) > System.currentTimeMillis() ? 4 : 2;
+        event.setAmount(event.getAmount() * multiplier);
     }
 
     private boolean equipEffect(Player player, String effect, boolean isAugmented, boolean consumeItem) {
@@ -537,6 +569,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         long cooldownSeconds = Math.max(0, getConfig().getLong("effects." + effect + ".cooldown-seconds", 60));
         int durationTicks = (int) Math.max(1, getConfig().getLong("effects." + effect + ".spark-seconds", 15) * 20L);
         cooldowns.put(key, now + cooldownSeconds * 1000L);
+        sparkEnds.put(key, now + durationTicks * 50L);
         p.playSound(p.getLocation(), getConfig().getString("settings.use-sound", "custom.activate"), 1.0f, 1.0f);
         switch (effect) {
             case "speed" -> {
