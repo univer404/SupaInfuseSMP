@@ -893,6 +893,14 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
+    private boolean isEmeraldConsumable(Material material) {
+        return switch (material) {
+            case GOLDEN_CARROT, GOLDEN_APPLE, ENCHANTED_GOLDEN_APPLE, COOKIE, MELON_SLICE,
+                    PUMPKIN_PIE, BEETROOT_SOUP, MUSHROOM_STEW -> true;
+            default -> false;
+        };
+    }
+
     public void prepareRegenerationFood(PlayerInteractEvent event) {
         if (!event.getAction().isRightClick() || event.getItem() == null || !event.getItem().getType().isEdible()) return;
         Player player = event.getPlayer();
@@ -933,7 +941,7 @@ public final class Infuse extends JavaPlugin {
                 player.setSaturation(Math.min(20.0f, player.getSaturation() + saturation));
                 player.setFoodLevel(20);
             }
-            if (Arrays.asList(activeSlots).contains("emerald")) {
+            if (Arrays.asList(activeSlots).contains("emerald") && isEmeraldConsumable(item.getType())) {
                 String key = player.getUniqueId() + ":emerald";
                 boolean sparkActive = sparkEnds.getOrDefault(key, 0L) > System.currentTimeMillis();
                 double chance = getConfig().getDouble(sparkActive ? "effects.emerald.spark-no-consume-chance" : "effects.emerald.no-consume-chance", sparkActive ? 0.75 : 0.5);
@@ -2096,11 +2104,11 @@ public final class Infuse extends JavaPlugin {
             if (Arrays.asList(slots(victim.getUniqueId())).contains("emerald") &&
                     hitsAgainstVictim % Math.max(1, getConfig().getInt("effects.emerald.trigger-hits", 10)) == 0) {
                 int cooldownTicks = Math.max(0, getConfig().getInt("effects.emerald.hit-item-cooldown-ticks", 200));
-                for (Material material : Material.values()) {
-                    if (material.isEdible() || material == Material.POTION || material == Material.SPLASH_POTION ||
-                            material == Material.LINGERING_POTION || material == Material.EXPERIENCE_BOTTLE) {
-                        attacker.setCooldown(material, cooldownTicks);
-                    }
+                for (Material material : List.of(Material.GOLDEN_CARROT, Material.GOLDEN_APPLE,
+                        Material.ENCHANTED_GOLDEN_APPLE, Material.COOKIE, Material.MELON_SLICE,
+                        Material.PUMPKIN_PIE, Material.BEETROOT_SOUP, Material.MUSHROOM_STEW,
+                        Material.EXPERIENCE_BOTTLE)) {
+                    attacker.setCooldown(material, cooldownTicks);
                 }
             }
         }
