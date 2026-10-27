@@ -54,6 +54,7 @@ public final class Infuse extends JavaPlugin {
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> hitCounters = new HashMap<>();
     private final Map<String, Integer> hitPairs = new HashMap<>();
+    private final Map<UUID, Deque<DamageSample>> recentDamage = new HashMap<>();
     private final Set<UUID> xpTransferBypass = new HashSet<>();
     private final Map<UUID, Integer> hasteStacks = new HashMap<>();
     private final Map<UUID, org.bukkit.attribute.AttributeModifier> hasteModifiers = new HashMap<>();
@@ -1018,7 +1019,7 @@ public final class Infuse extends JavaPlugin {
             case "heart" -> {
                 var attribute = p.getAttribute(Attribute.MAX_HEALTH);
                 if (attribute != null) attribute.setBaseValue(40.0);
-                p.setHealth(Math.min(40.0, p.getHealth() + Math.max(2.0, p.getMaxHealth() * getConfig().getDouble("effects.heart.spark-heal-percentage", 0.2))));
+                p.setHealth(Math.min(40.0, p.getHealth() + recentDamageAmount(p.getUniqueId()) * getConfig().getDouble("effects.heart.spark-heal-percentage", 0.2)));
                 Bukkit.getScheduler().runTaskLater(this, () -> {
                     if (!p.isOnline()) return;
                     var currentAttribute = p.getAttribute(Attribute.MAX_HEALTH);
@@ -1124,11 +1125,12 @@ public final class Infuse extends JavaPlugin {
 
     private void activateRegenerationSpark(Player caster) {
         int iterations = Math.max(1, getConfig().getInt("effects.regeneration.spark-heal-iteration", 15));
-        double percentage = getConfig().getDouble("effects.regeneration.spark-heal-percentage", 0.2) / iterations;
+        double totalHealing = recentDamageAmount(caster.getUniqueId()) * getConfig().getDouble("effects.regeneration.spark-heal-percentage", 0.2);
+        double healingPerTick = totalHealing / iterations;
         final int[] completed = {0};
         Bukkit.getScheduler().runTaskTimer(this, task -> {
             if (!caster.isOnline() || completed[0] >= iterations) { task.cancel(); return; }
-            healTrustedNearby(caster, getConfig().getDouble("effects.regeneration.spark-heal-radius", 8), percentage);
+            healTrustedNearby(caster, getConfig().getDouble("effects.regeneration.spark-heal-radius", 8), healingPerTick);
             caster.getWorld().spawnParticle(org.bukkit.Particle.HEART, caster.getLocation().add(0, 1, 0), 3, 0.4, 0.5, 0.4, 0);
             completed[0]++;
             if (completed[0] >= iterations) task.cancel();
@@ -1310,8 +1312,8 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
-    private void healTrustedNearby(Player caster, double radius, double percentage) {
-        double amount = Math.max(1.0, caster.getMaxHealth() * percentage);
+    private void healTrustedNearby(Player caster, double radius, double amount) {
+        if (amount <= 0) return;
         caster.setHealth(Math.min(caster.getMaxHealth(), caster.getHealth() + amount));
         for (Player target : caster.getWorld().getPlayers()) {
             if (target.equals(caster) || !trustManager.getTrusted(caster.getUniqueId()).contains(target.getUniqueId())) continue;
@@ -1632,6 +1634,34 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
+    public void recordDamageDealt(Player attacker, double amount) {
+        if (attacker == null || amount <= 0 || !Double.isFinite(amount)) return;
+        UUID id = attacker.getUniqueId();
+        DamageSample sample = new DamageSample(System.currentTimeMillis(), amount);
+        recentDamage.computeIfAbsent(id, ignored -> new ArrayDeque<>()).addLast(sample);
+        long windowTicks = Math.max(1, getConfig().getLong("settings.recent-damage-window-seconds", 30)) * 20L;
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            Deque<DamageSample> samples = recentDamage.get(id);
+            if (samples == null) return;
+            samples.remove(sample);
+            if (samples.isEmpty()) recentDamage.remove(id);
+        }, windowTicks);
+    }
+
+    private double recentDamageAmount(UUID playerId) {
+        Deque<DamageSample> samples = recentDamage.get(playerId);
+        if (samples == null || samples.isEmpty()) return 0.0;
+        long cutoff = System.currentTimeMillis() - Math.max(1, getConfig().getLong("settings.recent-damage-window-seconds", 30)) * 1000L;
+        while (!samples.isEmpty() && samples.peekFirst().time() < cutoff) samples.removeFirst();
+        if (samples.isEmpty()) {
+            recentDamage.remove(playerId);
+            return 0.0;
+        }
+        return samples.stream().mapToDouble(DamageSample::amount).sum();
+    }
+
+    private record DamageSample(long time, double amount) {}
+
     private int countHit(Player player, String effect) {
         String key = player.getUniqueId() + ":" + effect;
         int count = hitCounters.getOrDefault(key, 0) + 1;
@@ -1690,6 +1720,7 @@ public final class Infuse extends JavaPlugin {
         fireGlidingPlayers.remove(player.getUniqueId());
         oceanAir.remove(player.getUniqueId());
         oceanLastActive.remove(player.getUniqueId());
+        recentDamage.remove(player.getUniqueId());
     }
 
     private void clearSpeedStack(Player player) {
@@ -1713,10 +1744,6 @@ public final class Infuse extends JavaPlugin {
     @EventHandler public void join(PlayerJoinEvent e) {
         Player joining = e.getPlayer();
         slots(joining.getUniqueId());
-        long joinedAt = System.currentTimeMillis();
-        for (String effect : EFFECTS) {
-            cooldowns.put(joining.getUniqueId() + ":" + effect, joinedAt + Math.max(0, getConfig().getLong("effects." + effect + ".cooldown-seconds", 60)) * 1000L);
-        }
         if (!joining.hasPlayedBefore() && getConfig().getBoolean("settings.roll-first-join", false)) {
             List<String> rollEffects = EFFECTS.stream().filter(effect -> !effect.equals("earth") && !effect.equals("ender")).toList();
             if (!rollEffects.isEmpty()) {
