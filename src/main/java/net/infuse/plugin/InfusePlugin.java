@@ -711,7 +711,11 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private void applyPassives() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             String[] activeSlots = slots(player.getUniqueId());
-            if (disabled(player)) continue;
+            if (disabled(player)) {
+                var attribute = player.getAttribute(Attribute.MAX_HEALTH);
+                if (attribute != null && attribute.getBaseValue() == 30.0) attribute.setBaseValue(20.0);
+                continue;
+            }
             Set<String> active = new HashSet<>(Arrays.asList(activeSlots));
             active.remove("");
             if (active.contains("speed")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
@@ -795,7 +799,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }
     }
     @EventHandler public void damage(EntityDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player attacker)) return;
+        if (!(event.getDamager() instanceof Player attacker) || disabled(attacker)) return;
         if (!(event.getEntity() instanceof org.bukkit.entity.LivingEntity target)) return;
         if (target instanceof Player victim && trusted.getOrDefault(attacker.getUniqueId(), Set.of()).contains(victim.getUniqueId())) return;
         String[] activeSlots = slots(attacker.getUniqueId());
