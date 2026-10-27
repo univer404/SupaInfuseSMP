@@ -816,7 +816,14 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @EventHandler public void sneakControl(PlayerToggleSneakEvent event) {
         if (!event.isSneaking()) return;
-        triggerBoundSpark(event.getPlayer(), "sneak", event);
+        Player player = event.getPlayer();
+        String[] configured = controls.getOrDefault(player.getUniqueId(), new String[]{"none", "none"});
+        for (int i = 0; i < configured.length; i++) {
+            if (configured[i].equalsIgnoreCase("sneak")) {
+                spark(player, i == 0 ? "primary" : "secondary");
+                return;
+            }
+        }
     }
 
     private void triggerBoundSpark(Player player, String action, org.bukkit.event.Cancellable event) {
