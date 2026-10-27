@@ -1891,7 +1891,7 @@ public final class Infuse extends JavaPlugin {
             active.remove("");
             if (!active.contains("speed")) clearSpeedStack(player);
             if (!active.contains("haste")) { clearHasteStack(player); updateHasteBreakSpeed(player, false); }
-            if (!active.contains("feather")) windCharges.remove(player.getUniqueId());
+            if (!active.contains("feather")) clearWindChargeVisuals(player.getUniqueId());
             if (active.contains("speed")) player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
             if (active.contains("haste")) {
                 decayHasteStack(player);
@@ -2189,8 +2189,9 @@ public final class Infuse extends JavaPlugin {
                         Math.max(1, getConfig().getInt("effects.frost.mining-fatigue-duration-ticks", 200)),
                         Math.max(0, getConfig().getInt("effects.frost.mining-fatigue-amplifier", 1)), true, false, true));
                 if (!frostSparkActive && target instanceof Player frostVictim) {
-                    windChargeCooldowns.put(frostVictim.getUniqueId(), System.currentTimeMillis()
-                            + Math.max(0, getConfig().getLong("effects.frost.wind-charge-cooldown-seconds", 10)) * 1000L);
+                    long cooldownSeconds = Math.max(0, getConfig().getLong("effects.frost.wind-charge-cooldown-seconds", 10));
+                    windChargeCooldowns.put(frostVictim.getUniqueId(), System.currentTimeMillis() + cooldownSeconds * 1000L);
+                    frostVictim.setCooldown(Material.WIND_CHARGE, (int) (cooldownSeconds * 20L));
                 }
             }
         }
