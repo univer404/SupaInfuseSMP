@@ -45,6 +45,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<UUID, Integer> hasteStacks = new HashMap<>();
     private final Map<UUID, org.bukkit.attribute.AttributeModifier> hasteModifiers = new HashMap<>();
     private final Map<UUID, org.bukkit.scheduler.BukkitTask> hasteResetTasks = new HashMap<>();
+    private final Map<UUID, Double> speedStacks = new HashMap<>();
+    private final Map<UUID, org.bukkit.attribute.AttributeModifier> speedModifiers = new HashMap<>();
     private final Map<String, Long> sparkEnds = new HashMap<>();
     private final Map<UUID, Long> trustActionCooldowns = new HashMap<>();
     private final Set<UUID> invisiblePlayers = new HashSet<>();
@@ -83,6 +85,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             for (Player hidden : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, hidden);
             clearHasteStack(viewer);
+            clearSpeedStack(viewer);
         }
         saveData();
     }
@@ -763,6 +766,23 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         event.setCancelled(true);
         String[] parts = encoded.split(":");
         equipEffect(player, parts[0], parts.length > 1 && parts[1].equalsIgnoreCase("augmented"), true);
+    }
+
+    private void applySpeedStack(Player player, double change) {
+        UUID id = player.getUniqueId();
+        var attribute = player.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (attribute == null) return;
+        double minimum = getConfig().getDouble("effects.speed.max-penalty", -0.5);
+        double maximum = getConfig().getDouble("effects.speed.stack-cap", 1.0);
+        double amount = Math.max(minimum, Math.min(maximum, speedStacks.getOrDefault(id, 0.0) + change));
+        speedStacks.put(id, amount);
+        org.bukkit.attribute.AttributeModifier previous = speedModifiers.remove(id);
+        if (previous != null) attribute.removeModifier(previous);
+        if (Math.abs(amount) < 0.0001) { speedStacks.remove(id); return; }
+        org.bukkit.attribute.AttributeModifier modifier = new org.bukkit.attribute.AttributeModifier(
+                new NamespacedKey(this, "speed_stack_" + id), amount, org.bukkit.attribute.AttributeModifier.Operation.MULTIPLY_SCALAR_1);
+        attribute.addModifier(modifier);
+        speedModifiers.put(id, modifier);
     }
 
     private void addHasteStack(Player player) {
@@ -1500,11 +1520,25 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             int iframeTicks = Math.max(0, getConfig().getInt("effects.haste.iframe-duration", 19));
             Bukkit.getScheduler().runTaskLater(this, () -> target.setNoDamageTicks(iframeTicks), 1L);
         }
+        if (active.contains("speed")) applySpeedStack(attacker, getConfig().getDouble("effects.speed.hit-increase", 0.1));
+        if (target instanceof Player speedVictim && Arrays.asList(slots(speedVictim.getUniqueId())).contains("speed")) {
+            applySpeedStack(speedVictim, getConfig().getDouble("effects.speed.hit-decrease", -0.1));
+        }
         if (active.contains("strength")) {
             double multiplier = target instanceof Player ? 1.2 : getConfig().getDouble("effects.strength.mob-damage-multiplier", 2.0);
-            if (sparkEnds.getOrDefault(attacker.getUniqueId() + ":strength", 0L) > System.currentTimeMillis()) multiplier *= 1.5;
-            event.setDamage(event.getDamage() * multiplier);
-            if (target instanceof Player victim && victim.isBlocking()) {
+            double lostHealth = Math.max(0, attacker.getMaxHealth() - attacker.getHealth());
+            event.setDamage(event.getDamage() * multiplier + lostHealth * getConfig().getDouble("effects.strength.hp-loss-atk-bonus", 0.05));
+            boolean sparkActive = sparkEnds.getOrDefault(attacker.getUniqueId() + ":strength", 0L) > System.currentTimeMillis();
+            if (sparkActive) {
+                boolean critical = attacker.getFallDistance() > 0 && !attacker.isOnGround() && !attacker.isSprinting() &&
+                        !attacker.isInWater() && !attacker.hasPotionEffect(PotionEffectType.SLOW_FALLING);
+                event.setDamage(event.getDamage() * (critical ? getConfig().getDouble("effects.strength.double-crit-mult", 2.0) : 1.5));
+                attacker.getWorld().spawnParticle(critical ? org.bukkit.Particle.END_ROD : org.bukkit.Particle.CRIT,
+                        target.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.2);
+                if (!critical) attacker.playSound(attacker.getLocation(), "entity.player.attack.crit", 1.0f, 1.0f);
+            }
+            if (sparkActive && target instanceof Player victim && victim.isBlocking() &&
+                    (attacker.getInventory().getItemInMainHand().getType().name().endsWith("_AXE"))) {
                 victim.setCooldown(Material.SHIELD, getConfig().getInt("effects.strength.shield-disable-ticks", 200));
                 ItemStack shield = victim.getInventory().getItemInOffHand().getType() == Material.SHIELD
                         ? victim.getInventory().getItemInOffHand() : victim.getInventory().getItemInMainHand().getType() == Material.SHIELD
@@ -1514,6 +1548,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                     shield.setItemMeta((org.bukkit.inventory.meta.ItemMeta) damageable);
                     if (damageable.getDamage() >= shield.getType().getMaxDurability()) shield.setAmount(0);
                 }
+                event.setDamage(event.getDamage() + event.getDamage() / Math.max(1.0, getConfig().getDouble("effects.strength.shield-penetration", 2.0)));
             }
         }
         if (active.contains("feather") && attacker.getFallDistance() > getConfig().getDouble("effects.feather.wind-burst-fall-min", 2.0)) {
@@ -1622,10 +1657,19 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     public void quit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         clearHasteStack(player);
+        clearSpeedStack(player);
         invisiblePlayers.remove(player.getUniqueId());
         fireGlidingPlayers.remove(player.getUniqueId());
         oceanAir.remove(player.getUniqueId());
         oceanLastActive.remove(player.getUniqueId());
+    }
+
+    private void clearSpeedStack(Player player) {
+        UUID id = player.getUniqueId();
+        org.bukkit.attribute.AttributeModifier modifier = speedModifiers.remove(id);
+        var attribute = player.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (attribute != null && modifier != null) attribute.removeModifier(modifier);
+        speedStacks.remove(id);
     }
 
     private void clearHasteStack(Player player) {
