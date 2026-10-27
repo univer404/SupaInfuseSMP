@@ -36,22 +36,26 @@ effects:
     hit-item-cooldown-ticks: 100
   feather:
     color: "#BEA3CA"
-    cooldown-seconds: 60
-    spark-seconds: 15
+    cooldown-seconds: 40
+    spark-seconds: 5
     craft-limit: -1
     augment-limit: 0
-    initial-bounce-power: 1.2
-    trigger-hits: 3
-    max-wind-charge: 2
-    wind-burst-fall-min: 2.0
-    wind-burst-power: 1.0
+    initial-bounce-power: 2.0
+    trigger-hits: 10
+    max-wind-charge: 3
+    wind-burst-fall-min: 10.0
+    wind-burst-power: 1.5
     wind-burst-damage-multiplier: 0.5
-    fall-trigger-threshold: 4.0
-    min-shockwave-radius: 2.0
-    max-shockwave-radius: 8.0
+    wind-charge-speed: 2.0
+    wind-charge-cooldown-seconds: 5
+    fall-trigger-threshold: 3.0
+    min-shockwave-radius: 3.0
+    max-shockwave-radius: 12.0
     shockwave-true-damage: 2.0
     slow-falling-duration-ticks: 100
-    bounce-coefficient: 4.0
+    bounce-coefficient: 1.5
+    shockwave-rings: 8
+    shockwave-draw-interval-ticks: 1
   fire:
     color: "#FC7803"
     cooldown-seconds: 90
@@ -60,17 +64,30 @@ effects:
     augment-limit: 0
     trigger-hits: 5
     ignite-ticks: 100
-    eternal-ticks: 200
+    eternal-ticks: 32767
     snowball-cooldown-seconds: 15
-    swim-power: 0.5
+    swim-power: 0.4
+    launch-radius: 6.0
+    launch-power: 3.0
+    ignite-radius: 6.0
+    ignite-duration-ticks: 200
+    burn-radius: 6.0
   frost:
     color: "#7AE3FC"
     cooldown-seconds: 60
-    spark-seconds: 15
+    spark-seconds: 10
     craft-limit: -1
     augment-limit: 0
     trigger-hits: 10
     freeze-ticks: 600
+    mining-fatigue-duration-ticks: 200
+    mining-fatigue-amplifier: 1
+    move-speed: 1.5
+    spark-move-speed: 2.0
+    knockback-resistance: 0.3
+    lava-walk: true
+    replace-floor: true
+    wind-charge-cooldown-seconds: 10
   haste:
     color: "#B96C00"
     cooldown-seconds: 60
@@ -93,20 +110,32 @@ effects:
     return-after-hit: 10.0
   invisibility:
     color: "#7E00FC"
-    cooldown-seconds: 60
-    spark-seconds: 15
+    cooldown-seconds: 90
+    spark-seconds: 10
     craft-limit: -1
     augment-limit: 0
     trigger-hits: 10
+    base-spark-radius: 8.0
+    max-spark-radius: 12.0
+    teammate-coefficient: 1.0
+    blindness-duration-ticks: 200
+    invis-iteration: 50
+    invis-interval-ticks: 4
   ocean:
     color: "#005AFC"
-    cooldown-seconds: 60
-    spark-seconds: 15
+    cooldown-seconds: 90
+    spark-seconds: 5
     craft-limit: -1
     augment-limit: 0
     trident-pull-coefficient: 0.27
-    passive-radius: 4.0
-    drown-damage: 1.0
+    trident-pull-offset: 1.5
+    trident-pull-cap: 16.0
+    passive-radius: 8.0
+    drown-damage: 2.0
+    pull-interval-ticks: 2
+    pull-radius: 6.0
+    pull-strength: 0.1
+    pull-iterations: 50
   regeneration:
     color: "#FC00DD"
     cooldown-seconds: 60
@@ -115,15 +144,30 @@ effects:
     augment-limit: 0
     spark-heal-radius: 8
     spark-heal-iteration: 15
+    spark-heal-interval-ticks: 20
     spark-heal-percentage: 0.2
+    hit-duration-ticks: 60
+    trigger-hits: 10
+    food-nutrition: 3
+    food-saturation: 0.0
+    effect-hit-amplifier: 1
   speed:
     color: "#D1A44B"
-    cooldown-seconds: 60
-    spark-seconds: 15
+    cooldown-seconds: 20
+    spark-seconds: 1
     craft-limit: -1
     augment-limit: 0
+    multiplier: 0.2
+    hit-increase: 0.01
+    hit-decrease: -0.02
+    max-penalty: -0.2
+    stack-cap: 0.2
     dash-power: 2.6
+    dash-damping: 0.6
+    dash-iteration: 14
     dash-true-damage: 2.0
+    dash-effect-radius: 1.5
+    dash-interval-ticks: 1
   strength:
     color: "#9E2020"
     cooldown-seconds: 60
@@ -133,6 +177,9 @@ effects:
     mob-damage-multiplier: 2.0
     shield-disable-ticks: 200
     shield-durability-damage: 20
+    shield-penetration: 2.0
+    hp-loss-attack-bonus: 0.3
+    double-crit-multiplier: 1.334
   thunder:
     color: "#FCED00"
     cooldown-seconds: 90
@@ -143,6 +190,8 @@ effects:
     true-damage: 1.0
     trident-cooldown-seconds: 10
     lightning-chain-max: 10
+    lightning-chain-radius: 12.0
+    strike-time-max: 5
   earth:
     color: "#8A795D"
     cooldown-seconds: 60
