@@ -1,6 +1,6 @@
-package com.catadmirer.infuseSMP.effects;
+package com.supainfuse.smp.effects;
 
-import com.catadmirer.infuseSMP.Infuse;
+import com.supainfuse.smp.Infuse;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
