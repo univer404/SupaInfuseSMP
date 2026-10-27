@@ -68,6 +68,8 @@ public final class Infuse extends JavaPlugin {
     private final Map<UUID, Long> oceanLastActive = new HashMap<>();
     private final Set<UUID> fireGlidingPlayers = new HashSet<>();
     private final Map<UUID, Integer> windCharges = new HashMap<>();
+    private final Map<UUID, Long> windChargeCooldowns = new HashMap<>();
+    private final Set<UUID> lightningChainAttackers = new HashSet<>();
     private NamespacedKey effectKey;
     private MessageManager messageManager;
     private InfuseGui gui;
@@ -860,8 +862,10 @@ public final class Infuse extends JavaPlugin {
         if (disabled(event.getPlayer())) return;
         String[] activeSlots = slots(event.getPlayer().getUniqueId());
         if (!Arrays.asList(activeSlots).contains("emerald")) return;
-        int multiplier = sparkEnds.getOrDefault(event.getPlayer().getUniqueId() + ":emerald", 0L) > System.currentTimeMillis() ? 4 : 2;
-        event.setAmount(event.getAmount() * multiplier);
+        boolean sparkActive = sparkEnds.getOrDefault(event.getPlayer().getUniqueId() + ":emerald", 0L) > System.currentTimeMillis();
+        double extraMultiplier = getConfig().getDouble("effects.emerald.xp-gain-per-hit", 1.0);
+        if (sparkActive) extraMultiplier += getConfig().getDouble("effects.emerald.spark-xp-gain", 2.0);
+        event.setAmount(Math.max(0, (int) Math.round(event.getAmount() * (1.0 + extraMultiplier))));
     }
 
     private boolean equipEffect(Player player, String effect, boolean isAugmented, boolean consumeItem) {
@@ -1599,17 +1603,27 @@ public final class Infuse extends JavaPlugin {
                 attacker.playSound(attacker.getLocation(), "entity.blaze.shoot", 1.0f, 1.0f);
             }
         }
-        if (active.contains("thunder")) {
-            int threshold = getConfig().getInt("effects.thunder.trigger-hits", 10);
-            if (attacker.getWorld().hasStorm() && attacker.getWorld().isThundering()) threshold = Math.max(1, threshold / 2);
+        if (active.contains("thunder") && !lightningChainAttackers.contains(attacker.getUniqueId())) {
+            int threshold = Math.max(1, getConfig().getInt("effects.thunder.trigger-hits", 10));
+            if (attacker.getWorld().hasStorm()) threshold = Math.max(1, threshold / 2);
             if (countHit(attacker, "thunder") % threshold == 0) {
                 attacker.getWorld().strikeLightningEffect(target.getLocation());
-                if (getConfig().getBoolean("settings.allow-true-damage", true)) event.setDamage(event.getDamage() + getConfig().getDouble("effects.thunder.true-damage", 1.0));
+                if (getConfig().getBoolean("settings.allow-true-damage", true)) {
+                    event.setDamage(event.getDamage() + getConfig().getDouble("effects.thunder.true-damage", 1.0));
+                }
+                chainLightning(attacker, target, getConfig().getInt("effects.thunder.lightning-chain-max", 10),
+                        getConfig().getDouble("effects.thunder.lightning-chain-radius", 12.0));
             }
         }
-        if (active.contains("frost") && countHit(attacker, "frost") % getConfig().getInt("effects.frost.trigger-hits", 10) == 0) {
+        if (active.contains("frost") && countHit(attacker, "frost") % Math.max(1, getConfig().getInt("effects.frost.trigger-hits", 10)) == 0) {
             target.setFreezeTicks(Math.max(target.getFreezeTicks(), getConfig().getInt("effects.frost.freeze-ticks", 600)));
-            target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, 200, 1, true, false, true));
+            target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE,
+                    Math.max(1, getConfig().getInt("effects.frost.mining-fatigue-duration-ticks", 200)),
+                    Math.max(0, getConfig().getInt("effects.frost.mining-fatigue-amplifier", 1)), true, false, true));
+            if (target instanceof Player frostVictim) {
+                windChargeCooldowns.put(frostVictim.getUniqueId(), System.currentTimeMillis()
+                        + Math.max(0, getConfig().getLong("effects.frost.wind-charge-cooldown-seconds", 10)) * 1000L);
+            }
         }
         if (active.contains("invisibility") && countHit(attacker, "invisibility") % getConfig().getInt("effects.invisibility.trigger-hits", 10) == 0) {
             target.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 200, 0, true, false, true));
@@ -1630,7 +1644,38 @@ public final class Infuse extends JavaPlugin {
             }
         }
         if (active.contains("emerald") && target instanceof Player) {
-            attacker.giveExp(getConfig().getInt("effects.emerald.xp-gain-per-hit", 1));
+            attacker.giveExp(Math.max(0, getConfig().getInt("effects.emerald.xp-steal-amount", 2)));
+        }
+    }
+
+    private void chainLightning(Player attacker, org.bukkit.entity.LivingEntity firstTarget, int maxTargets, double radius) {
+        if (maxTargets <= 1 || radius <= 0) return;
+        Set<UUID> hitEntities = new HashSet<>();
+        hitEntities.add(firstTarget.getUniqueId());
+        org.bukkit.entity.LivingEntity previous = firstTarget;
+        lightningChainAttackers.add(attacker.getUniqueId());
+        try {
+            for (int hit = 1; hit < maxTargets; hit++) {
+                org.bukkit.entity.LivingEntity next = null;
+                double closestDistance = radius * radius;
+                for (org.bukkit.entity.Entity entity : previous.getNearbyEntities(radius, radius, radius)) {
+                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.isDead()) continue;
+                    if (living.equals(attacker) || hitEntities.contains(living.getUniqueId())) continue;
+                    if (living instanceof Player targetPlayer && trustManager.isTrusted(attacker.getUniqueId(), targetPlayer.getUniqueId())) continue;
+                    double distance = previous.getLocation().distanceSquared(living.getLocation());
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        next = living;
+                    }
+                }
+                if (next == null) break;
+                hitEntities.add(next.getUniqueId());
+                attacker.getWorld().strikeLightningEffect(next.getLocation());
+                next.damage(Math.max(0.0, getConfig().getDouble("effects.thunder.true-damage", 1.0)), attacker);
+                previous = next;
+            }
+        } finally {
+            lightningChainAttackers.remove(attacker.getUniqueId());
         }
     }
 
