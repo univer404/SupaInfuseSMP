@@ -1091,15 +1091,7 @@ public final class Infuse extends JavaPlugin {
                 p.getWorld().spawnParticle(org.bukkit.Particle.FLAME, p.getLocation().add(0, 1, 0), 40, 2.5, 1.5, 2.5, 0.05);
                 p.playSound(p.getLocation(), "block.lava.extinguish", 1.0f, 0.8f);
             }
-            case "thunder" -> {
-                int strikes = 0;
-                for (org.bukkit.entity.Entity entity : p.getNearbyEntities(20, 10, 20)) {
-                    if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(p)) continue;
-                    if (entity instanceof Player target && trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
-                    p.getWorld().strikeLightning(living.getLocation());
-                    if (++strikes >= getConfig().getInt("effects.thunder.lightning-chain-max", 10)) break;
-                }
-            }
+            case "thunder" -> activateThunderSpark(p);
             case "ocean" -> {
                 p.setRemainingAir(p.getMaximumAir());
                 p.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, durationTicks, 0, true, false, true));
@@ -1142,6 +1134,43 @@ public final class Infuse extends JavaPlugin {
             case "earth" -> p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, false, true));
         }
         p.sendMessage(mini.deserialize("<#A855F7>"+title(effect)+" Spark activated."));
+    }
+
+    private void activateThunderSpark(Player caster) {
+        double maximumRadius = 20.0;
+        List<org.bukkit.entity.LivingEntity> nearby = new ArrayList<>();
+        for (org.bukkit.entity.Entity entity : caster.getNearbyEntities(maximumRadius, maximumRadius, maximumRadius)) {
+            if (!(entity instanceof org.bukkit.entity.LivingEntity living) || living.equals(caster) || living.isDead()) continue;
+            if (living instanceof Player target && trustManager.isTrusted(caster.getUniqueId(), target.getUniqueId())) continue;
+            nearby.add(living);
+        }
+        double radius = Math.min(nearby.size() * 3.0 + 3.0, maximumRadius);
+        double radiusSquared = radius * radius;
+        List<org.bukkit.entity.LivingEntity> targets = nearby.stream()
+                .filter(target -> target.getLocation().distanceSquared(caster.getLocation()) <= radiusSquared)
+                .toList();
+        caster.getWorld().spawnParticle(org.bukkit.Particle.FLAME, caster.getLocation().add(0, 1, 0),
+                1, radius, 0.1, radius, 0.05);
+        int strikes = Math.max(1, getConfig().getInt("effects.thunder.strike-time-max", 5));
+        double damage = Math.max(0.0, getConfig().getDouble("effects.thunder.true-damage", 1.0));
+        for (int strike = 0; strike < strikes; strike++) {
+            long delay = strike * 20L;
+            Bukkit.getScheduler().runTaskLater(this, () -> {
+                if (!caster.isOnline()) return;
+                lightningChainAttackers.add(caster.getUniqueId());
+                try {
+                    for (org.bukkit.entity.LivingEntity target : targets) {
+                        if (target.isDead() || !target.isValid()) continue;
+                        caster.getWorld().strikeLightningEffect(target.getLocation());
+                        if (getConfig().getBoolean("settings.allow-true-damage", true) && damage > 0) {
+                            target.damage(damage, caster);
+                        }
+                    }
+                } finally {
+                    lightningChainAttackers.remove(caster.getUniqueId());
+                }
+            }, delay);
+        }
     }
 
     private void activateFeatherShockwave(Player player) {
