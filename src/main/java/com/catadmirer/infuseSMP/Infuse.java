@@ -72,6 +72,9 @@ public final class Infuse extends JavaPlugin {
     private final Map<UUID, Integer> windCharges = new HashMap<>();
     private final Map<UUID, Long> windChargeCooldowns = new HashMap<>();
     private final Set<UUID> lightningChainAttackers = new HashSet<>();
+    private final Map<UUID, Long> enderCurses = new HashMap<>();
+    private final Set<UUID> enderDamageShareGuard = new HashSet<>();
+    private final Set<UUID> enderSparkCooldownReset = new HashSet<>();
     private NamespacedKey effectKey;
     private MessageManager messageManager;
     private InfuseGui gui;
@@ -761,6 +764,7 @@ public final class Infuse extends JavaPlugin {
                     Math.max(1, getConfig().getInt("effects.frost.mining-fatigue-duration-ticks", 200)),
                     Math.max(0, getConfig().getInt("effects.frost.mining-fatigue-amplifier", 1)), true, false, true));
         }
+        if (active.contains("ender") && target instanceof Player victim) applyEnderCurse(shooter, victim);
     }
 
     public void onProjectileShoot(org.bukkit.event.entity.EntityShootBowEvent event) {
@@ -800,6 +804,69 @@ public final class Infuse extends JavaPlugin {
     }
 
     @EventHandler
+    public void convertDragonBreath(PlayerInteractEvent event) {
+        if (!event.getAction().isRightClick() || event.getItem() == null || event.getItem().getType() != Material.DRAGON_BREATH) return;
+        Player player = event.getPlayer();
+        if (disabled(player) || !Arrays.asList(slots(player.getUniqueId())).contains("ender")) return;
+        String key = player.getUniqueId() + ":ender-dragon-fireball";
+        long now = System.currentTimeMillis();
+        long until = cooldowns.getOrDefault(key, 0L);
+        if (until > now) {
+            event.setCancelled(true);
+            player.sendMessage(mini.deserialize("<red>Dragon breath is recharging for " + ((until - now + 999) / 1000) + "s."));
+            return;
+        }
+        event.setCancelled(true);
+        ItemStack held = event.getHand() == org.bukkit.inventory.EquipmentSlot.OFF_HAND
+                ? player.getInventory().getItemInOffHand() : player.getInventory().getItemInMainHand();
+        if (held.getAmount() > 1) held.setAmount(held.getAmount() - 1);
+        else if (event.getHand() == org.bukkit.inventory.EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(null);
+        else player.getInventory().setItemInMainHand(null);
+        org.bukkit.entity.DragonFireball fireball = player.getWorld().spawn(player.getEyeLocation(), org.bukkit.entity.DragonFireball.class);
+        fireball.setShooter(player);
+        fireball.setVelocity(player.getLocation().getDirection().multiply(
+                getConfig().getDouble("effects.ender.dragon-fireball-speed", 2.0)));
+        cooldowns.put(key, now + Math.max(0, getConfig().getLong("effects.ender.dragon-fireball-cooldown-seconds", 10)) * 1000L);
+        player.playSound(player.getLocation(), "entity.ender_dragon.shoot", 1.0f, 1.0f);
+    }
+
+    private void applyEnderCurse(Player owner, Player target) {
+        if (owner.equals(target) || trustManager.isTrusted(owner.getUniqueId(), target.getUniqueId())) return;
+        UUID targetId = target.getUniqueId();
+        long duration = Math.max(1, getConfig().getLong("effects.ender.curse-duration-seconds", 15)) * 1000L;
+        long expiresAt = System.currentTimeMillis() + duration;
+        enderCurses.put(targetId, expiresAt);
+        target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, Math.max(20, (int) (duration / 50L)), 0, true, false, true));
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (enderCurses.getOrDefault(targetId, 0L) <= System.currentTimeMillis()) enderCurses.remove(targetId);
+        }, Math.max(1, duration / 50L));
+    }
+
+    public void shareCursedDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player victim)) return;
+        if (enderDamageShareGuard.contains(attacker.getUniqueId()) || disabled(attacker)) return;
+        if (!Arrays.asList(slots(attacker.getUniqueId())).contains("ender")) return;
+        if (enderCurses.getOrDefault(victim.getUniqueId(), 0L) <= System.currentTimeMillis()) {
+            enderCurses.remove(victim.getUniqueId());
+            return;
+        }
+        double damage = event.getFinalDamage();
+        if (damage <= 0) return;
+        enderDamageShareGuard.add(attacker.getUniqueId());
+        try {
+            for (Player cursed : Bukkit.getOnlinePlayers()) {
+                if (cursed.equals(victim) || cursed.equals(attacker) || disabled(cursed)) continue;
+                if (enderCurses.getOrDefault(cursed.getUniqueId(), 0L) <= System.currentTimeMillis()) {
+                    enderCurses.remove(cursed.getUniqueId());
+                    continue;
+                }
+                cursed.damage(damage, attacker);
+            }
+        } finally {
+            enderDamageShareGuard.remove(attacker.getUniqueId());
+        }
+    }
+
     public void prepareRegenerationFood(PlayerInteractEvent event) {
         if (!event.getAction().isRightClick() || event.getItem() == null || !event.getItem().getType().isEdible()) return;
         Player player = event.getPlayer();
@@ -1049,7 +1116,8 @@ public final class Infuse extends JavaPlugin {
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (sparkEnds.getOrDefault(key, 0L) <= System.currentTimeMillis()) {
                 sparkEnds.remove(key);
-                cooldowns.put(key, System.currentTimeMillis() + cooldownSeconds * 1000L);
+                if (effect.equals("ender") && enderSparkCooldownReset.remove(p.getUniqueId())) cooldowns.remove(key);
+                else cooldowns.put(key, System.currentTimeMillis() + cooldownSeconds * 1000L);
             }
         }, durationTicks);
         p.playSound(p.getLocation(), getConfig().getString("settings.use-sound", "custom.activate"), 1.0f, 1.0f);
@@ -1142,9 +1210,9 @@ public final class Infuse extends JavaPlugin {
                 }
                 for (org.bukkit.entity.Entity entity : p.getNearbyEntities(2, 2, 2)) {
                     if (entity instanceof Player target) {
-                        if (trustManager.getTrusted(p.getUniqueId()).contains(target.getUniqueId())) continue;
-                        target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, durationTicks, 0, true, false, true));
-                        cooldowns.remove(key);
+                        if (trustManager.isTrusted(p.getUniqueId(), target.getUniqueId())) continue;
+                        applyEnderCurse(p, target);
+                        enderSparkCooldownReset.add(p.getUniqueId());
                     } else if (entity instanceof org.bukkit.entity.LivingEntity living &&
                             living.getType() != org.bukkit.entity.EntityType.ENDER_DRAGON &&
                             living.getType() != org.bukkit.entity.EntityType.WITHER &&
