@@ -1054,7 +1054,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             if (now - oceanLastActive.getOrDefault(targetId, 0L) < 1100L) continue;
             int respiration = 0;
             ItemStack helmet = target.getInventory().getHelmet();
-            if (helmet != null) respiration = helmet.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.OXYGEN);
+            if (helmet != null) respiration = (enchantment("respiration") == null ? 0 : helmet.getEnchantmentLevel(enchantment("respiration")));
             int maxAir = 15 + respiration * 15;
             int remaining = oceanAir.getOrDefault(targetId, 0) + 2;
             if (remaining >= maxAir) { oceanAir.remove(targetId); oceanLastActive.remove(targetId); }
