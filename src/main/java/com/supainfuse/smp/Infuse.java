@@ -16,6 +16,7 @@ import com.supainfuse.smp.listeners.EffectItemListener;
 import com.supainfuse.smp.listeners.PlayerLifecycleListener;
 import com.supainfuse.smp.listeners.SparkControlListener;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Registry;
@@ -41,7 +42,7 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class Infuse extends JavaPlugin {
+public final class Infuse extends JavaPlugin implements Listener {
     public static final List<String> EFFECTS = EffectRegistry.playableEffects();
     private static final List<String> ICON_EFFECTS = EffectRegistry.iconEffects();
     private final MiniMessage mini = MiniMessage.miniMessage();
@@ -137,6 +138,7 @@ public final class Infuse extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new EmeraldEnchantingListener(this), this);
         getServer().getPluginManager().registerEvents(new CraftingGui(this), this);
         getServer().getPluginManager().registerEvents(recipeGui, this);
+        getServer().getPluginManager().registerEvents(this, this);
         passiveTask = Bukkit.getScheduler().runTaskTimer(this, this::applyPassives, 20L, 20L);
         getLogger().info("Infuse initialized. " + EFFECTS.size() + " effect identifiers registered.");
     }
@@ -690,7 +692,7 @@ public final class Infuse extends JavaPlugin {
     }
     public ItemStack named(Material material, String name) {
         ItemStack item = new ItemStack(material); ItemMeta meta=item.getItemMeta();
-        meta.displayName(mini.deserialize(name)); item.setItemMeta(meta); return item;
+        meta.displayName(mini.deserialize(name).decoration(TextDecoration.ITALIC, false)); item.setItemMeta(meta); return item;
     }
     public ItemStack createEffectItem(String effect, boolean augmented) {
         ItemStack item = new ItemStack(Material.POTION);
@@ -718,9 +720,9 @@ public final class Infuse extends JavaPlugin {
             default -> 414000;
         };
         meta.setCustomModelData(modelId + (augmented ? 100 : 0));
-        meta.displayName(mini.deserialize("<bold><" + color + ">" + (augmented ? "Augmented " : "") + title(effect) + " Effect"));
+        meta.displayName(mini.deserialize("<bold><" + color + ">" + (augmented ? "Augmented " : "") + title(effect) + " Effect").decoration(TextDecoration.ITALIC, false));
         List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
-        lore.add(mini.deserialize("<gray>Passive effects:"));
+        lore.add(mini.deserialize("<gray>Passive effects:").decoration(TextDecoration.ITALIC, false));
         lore.add(mini.deserialize("<dark_gray>• " + switch (effect) {
             case "emerald" -> "Improved XP and loot";
             case "feather" -> "Reduced fall damage and wind mobility";
@@ -736,9 +738,9 @@ public final class Infuse extends JavaPlugin {
             case "strength" -> "Improved melee damage";
             case "ender" -> "Ender curses and teleportation";
             default -> "Earth protection";
-        }));
-        lore.add(mini.deserialize("<gray>Spark: <white>Right-click while holding this item"));
-        lore.add(mini.deserialize("<dark_gray>Model: " + modelId + (augmented ? " (augmented)" : "")));
+        }).decoration(TextDecoration.ITALIC, false));
+        lore.add(mini.deserialize("<gray>Spark: <white>Right-click while holding this item").decoration(TextDecoration.ITALIC, false));
+        lore.add(mini.deserialize("<dark_gray>Model: " + modelId + (augmented ? " (augmented)" : "")).decoration(TextDecoration.ITALIC, false));
         meta.lore(lore);
         meta.getPersistentDataContainer().set(effectKey, PersistentDataType.STRING, effect + (augmented ? ":augmented" : ""));
         item.setItemMeta(meta);
@@ -1172,6 +1174,7 @@ public final class Infuse extends JavaPlugin {
         return false;
     }
 
+    @EventHandler
     public void inventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         String title = mini.serialize(e.getView().title());
