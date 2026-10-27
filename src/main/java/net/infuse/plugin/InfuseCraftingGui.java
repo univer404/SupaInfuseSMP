@@ -22,7 +22,7 @@ import java.util.*;
 final class InfuseCraftingGui implements Listener {
     private static final int[] INPUT_SLOTS = {12, 13, 14, 21, 22, 23, 30, 31, 32};
     private static final List<String> EFFECT_ORDER = List.of("emerald", "feather", "fire", "frost", "haste", "heart", "invisibility", "ocean", "regeneration", "speed", "strength", "thunder", "ender");
-    private static final Map<String, List<String>> RECIPES = recipes();
+    static final Map<String, List<String>> RECIPES = recipes();
     private final InfusePlugin plugin;
     private final Map<UUID, Inventory> openMenus = new HashMap<>();
 
