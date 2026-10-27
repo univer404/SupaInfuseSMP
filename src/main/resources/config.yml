@@ -32,9 +32,9 @@ effects:
     spark-no-consume-chance: 0.75
     spark-xp-gain: 2
     trigger-hits: 10
-    xp-share-amount: 1
+    xp-share-amount: 2
     xp-steal-amount: 2
-    hit-item-cooldown-ticks: 100
+    hit-item-cooldown-ticks: 200
   feather:
     color: "#BEA3CA"
     cooldown-seconds: 40
@@ -106,6 +106,7 @@ effects:
     food-absorption-tier: 0
     egap-absorption-tier: 4
     food-absorption-duration-ticks: 1200
+    egap-absorption-duration-ticks: 1200
     spark-heal-percentage: 0.2
     trigger-hits: 10
     return-after-hit: 10.0
@@ -133,6 +134,7 @@ effects:
     trident-pull-cap: 16.0
     passive-radius: 8.0
     drown-damage: 2.0
+    rain-damage-multiplier: 2.0
     pull-interval-ticks: 2
     pull-radius: 6.0
     pull-strength: 0.1
@@ -169,6 +171,7 @@ effects:
     dash-true-damage: 2.0
     dash-effect-radius: 1.5
     dash-interval-ticks: 1
+    projectile-speed-multiplier: 1.2
   strength:
     color: "#9E2020"
     cooldown-seconds: 60
