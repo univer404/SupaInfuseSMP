@@ -128,6 +128,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
             String[] values = slots(p.getUniqueId());
             String temp = values[0]; values[0] = values[1]; values[1] = temp;
+            boolean[] isAugmented = augmented.computeIfAbsent(p.getUniqueId(), ignored -> new boolean[]{false, false});
+            boolean tempAugmented = isAugmented[0]; isAugmented[0] = isAugmented[1]; isAugmented[1] = tempAugmented;
             saveData(); p.sendMessage(mini.deserialize("<green>Swapped your Infuse effects.")); return true;
         }
         if (command.getName().equalsIgnoreCase("recipes")) {
@@ -160,8 +162,9 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             if (!(sender instanceof Player p)) { tell(sender, "player-only"); return true; }
             if (args.length < 2 || !args[1].matches("primary|secondary|both")) { p.sendMessage("Usage: /infuse clear <primary|secondary|both>"); return true; }
             String[] s = slots(p.getUniqueId());
-            if (args[1].equalsIgnoreCase("primary") || args[1].equalsIgnoreCase("both")) s[0] = "";
-            if (args[1].equalsIgnoreCase("secondary") || args[1].equalsIgnoreCase("both")) s[1] = "";
+            boolean[] isAugmented = augmented.computeIfAbsent(p.getUniqueId(), ignored -> new boolean[]{false, false});
+            if (args[1].equalsIgnoreCase("primary") || args[1].equalsIgnoreCase("both")) { s[0] = ""; isAugmented[0] = false; }
+            if (args[1].equalsIgnoreCase("secondary") || args[1].equalsIgnoreCase("both")) { s[1] = ""; isAugmented[1] = false; }
             saveData(); p.sendMessage(mini.deserialize(message("effect-cleared"))); return true;
         }
         if (args[0].equalsIgnoreCase("spark")) {
