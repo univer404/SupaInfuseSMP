@@ -1943,7 +1943,15 @@ public final class Infuse extends JavaPlugin implements Listener {
             if (displayEnabled.getOrDefault(player.getUniqueId(), true)) {
                 // These private-use glyphs are supplied by the Infuse resource pack.
                 // Keep the HUD icon-only; do not render effect names or status text.
-                player.sendActionBar(mini.deserialize("\uE30E   \uE088")
+                String[] equippedEffects = slots(player.getUniqueId());
+                boolean[] equippedAugments = augmented.getOrDefault(player.getUniqueId(), new boolean[]{false, false});
+                String primaryHudIcon = equippedEffects[0] == null || equippedEffects[0].isBlank()
+                        ? "\uE088"
+                        : new String(Character.toChars(effectIconCodePoint(equippedEffects[0], equippedAugments[0])));
+                String secondaryHudIcon = equippedEffects[1] == null || equippedEffects[1].isBlank()
+                        ? "\uE088"
+                        : new String(Character.toChars(effectIconCodePoint(equippedEffects[1], equippedAugments[1])));
+                player.sendActionBar(mini.deserialize(primaryHudIcon + "   " + secondaryHudIcon)
                         .decoration(TextDecoration.ITALIC, false));
             }
             if (active.contains("ender")) {
