@@ -48,6 +48,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<UUID, Integer> oceanAir = new HashMap<>();
     private final Map<UUID, Long> oceanLastActive = new HashMap<>();
     private final Set<UUID> fireGlidingPlayers = new HashSet<>();
+    private final Map<UUID, Integer> windCharges = new HashMap<>();
     private NamespacedKey effectKey;
     private InfuseGui gui;
     private InfuseRecipeBookGui recipeGui;
@@ -1392,13 +1393,15 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     }
 
     @EventHandler public void environmentalDamage(org.bukkit.event.entity.EntityDamageEvent event) {
-        if (!(event.getEntity() instanceof Player player)) return;
+        if (!(event.getEntity() instanceof Player player) || disabled(player)) return;
         String[] active = slots(player.getUniqueId());
-        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL && Arrays.asList(active).contains("feather")) {
-            event.setCancelled(true);
-        }
-        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.DROWNING && Arrays.asList(active).contains("ocean")) {
-            event.setCancelled(true);
+        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL && Arrays.asList(active).contains("feather")) event.setCancelled(true);
+        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FLY_INTO_WALL && Arrays.asList(active).contains("feather")) event.setCancelled(true);
+        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.DROWNING && Arrays.asList(active).contains("ocean")) event.setCancelled(true);
+        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL && Arrays.asList(active).contains("fire")) {
+            for (org.bukkit.block.Block block : player.getLocation().getNearbyBlocks(1, 1, 1)) {
+                if (block.getType() == Material.LAVA) { event.setCancelled(true); break; }
+            }
         }
     }
     @EventHandler
@@ -1468,8 +1471,23 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 }
             }
         }
-        if (active.contains("fire") && countHit(attacker, "fire") % getConfig().getInt("effects.fire.trigger-hits", 5) == 0) {
-            target.setFireTicks(Math.max(target.getFireTicks(), getConfig().getInt("effects.fire.ignite-ticks", 100)));
+        if (active.contains("feather") && attacker.getFallDistance() > getConfig().getDouble("effects.feather.wind-burst-fall-min", 2.0)) {
+            float fallDistance = attacker.getFallDistance();
+            attacker.setVelocity(attacker.getVelocity().setY(0));
+            attacker.setVelocity(attacker.getVelocity().setY(getConfig().getDouble("effects.feather.wind-burst-power", 1.0)));
+            event.setDamage(event.getDamage() + fallDistance * getConfig().getDouble("effects.feather.wind-burst-damage-multiplier", 0.5));
+        }
+        if (active.contains("fire")) {
+            boolean sparkActive = sparkEnds.getOrDefault(attacker.getUniqueId() + ":fire", 0L) > System.currentTimeMillis();
+            if (sparkActive) {
+                target.setFireTicks(Math.max(target.getFireTicks(), getConfig().getInt("effects.fire.eternal-ticks", 200)));
+                attacker.getWorld().spawnParticle(org.bukkit.Particle.FLAME, target.getLocation().add(0, 1, 0), 15, 0.3, 0.3, 0.3, 0.05);
+                attacker.playSound(attacker.getLocation(), "entity.blaze.shoot", 1.0f, 1.0f);
+            } else if (countHit(attacker, "fire") % Math.max(1, getConfig().getInt("effects.fire.trigger-hits", 5)) == 0) {
+                target.setFireTicks(Math.max(target.getFireTicks(), getConfig().getInt("effects.fire.ignite-ticks", 100)));
+                attacker.getWorld().spawnParticle(org.bukkit.Particle.FLAME, target.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.05);
+                attacker.playSound(attacker.getLocation(), "entity.blaze.shoot", 1.0f, 1.0f);
+            }
         }
         if (active.contains("thunder")) {
             int threshold = getConfig().getInt("effects.thunder.trigger-hits", 10);
@@ -1486,7 +1504,21 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         if (active.contains("invisibility") && countHit(attacker, "invisibility") % getConfig().getInt("effects.invisibility.trigger-hits", 10) == 0) {
             target.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 200, 0, true, false, true));
         }
-        if (active.contains("regeneration")) attacker.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 60, 1, true, false, true));
+        if (active.contains("regeneration")) {
+            attacker.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 60, 1, true, false, true));
+            if (target instanceof Player victim && countHit(attacker, "regeneration") % Math.max(1, getConfig().getInt("effects.regeneration.trigger-hits", 10)) == 0 && victim.getSaturation() > 0) {
+                victim.setSaturation(Math.max(0, victim.getSaturation() - 1));
+            }
+        }
+        if (target instanceof Player victim && Arrays.asList(slots(victim.getUniqueId())).contains("feather")) {
+            int pairHits = hitPairs.getOrDefault(victim.getUniqueId() + ":" + attacker.getUniqueId(), 0);
+            int triggerHits = Math.max(1, getConfig().getInt("effects.feather.trigger-hits", 3));
+            int maxCharges = Math.max(0, getConfig().getInt("effects.feather.max-wind-charge", 2));
+            if (pairHits > 0 && pairHits % triggerHits == 0 && windCharges.getOrDefault(victim.getUniqueId(), 0) < maxCharges) {
+                windCharges.merge(victim.getUniqueId(), 1, Integer::sum);
+                victim.playSound(victim.getLocation(), "entity.wind_charge.wind_burst", 0.6f, 1.4f);
+            }
+        }
         if (active.contains("emerald") && target instanceof Player) {
             attacker.giveExp(getConfig().getInt("effects.emerald.xp-gain-per-hit", 1));
         }
