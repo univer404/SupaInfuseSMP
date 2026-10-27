@@ -17,7 +17,7 @@ public final class EffectItemListener implements Listener {
 
     public EffectItemListener(Infuse plugin) { this.plugin = plugin; }
 
-    @EventHandler public void onFireSnowball(PlayerInteractEvent event) { plugin.convertFireSnowballs(event); plugin.prepareRegenerationFood(event); }
+    @EventHandler public void onFireSnowball(PlayerInteractEvent event) { plugin.convertFireSnowballs(event); plugin.convertDragonBreath(event); plugin.prepareRegenerationFood(event); }
     @EventHandler public void onFoodLevelChange(FoodLevelChangeEvent event) { plugin.onFoodLevelChange(event); }
     @EventHandler public void onInvisibilityProjectile(ProjectileHitEvent event) { plugin.invisibilityRangedHit(event); }
     @EventHandler public void onTridentHit(ProjectileHitEvent event) { plugin.infuseTridentEffects(event); }
