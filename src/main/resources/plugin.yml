@@ -28,6 +28,11 @@ commands:
     description: Bind primary or secondary Spark to a player action.
     usage: /control <primary|secondary> <action>
     aliases: [controls, controlset, bind]
+  item:
+    description: Give an Infuse effect potion.
+    usage: /item <effect|all> [true|false]
+    aliases: [giveitem, i, potion, pot]
+    permission: infuse.admin
 permissions:
   infuse.admin:
     description: Manage Infuse settings and items.
