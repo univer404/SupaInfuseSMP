@@ -35,6 +35,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     private final Map<UUID, Set<UUID>> trusted = new HashMap<>();
     private final Map<UUID, List<String>> primaryHistory = new HashMap<>();
     private final Map<UUID, List<String>> secondaryHistory = new HashMap<>();
+    private final Map<UUID, Boolean> displayEnabled = new HashMap<>();
     private final Map<UUID, Integer> selectionMode = new HashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> hitCounters = new HashMap<>();
@@ -86,6 +87,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 controls.put(uuid, new String[]{data.getString(id + ".primary-bind", "none"), data.getString(id + ".secondary-bind", "none")});
                 primaryHistory.put(uuid, new ArrayList<>(data.getStringList(id + ".history-primary")));
                 secondaryHistory.put(uuid, new ArrayList<>(data.getStringList(id + ".history-secondary")));
+                displayEnabled.put(uuid, data.getBoolean(id + ".display-enabled", true));
                 Set<UUID> list = new HashSet<>();
                 for (String friend : data.getStringList(id + ".trusted")) try { list.add(UUID.fromString(friend)); } catch (IllegalArgumentException ignored) {}
                 trusted.put(uuid, list);
@@ -111,6 +113,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             getConfig().set(path + ".trusted", trusted.getOrDefault(id, Set.of()).stream().map(UUID::toString).toList());
             getConfig().set(path + ".history-primary", primaryHistory.getOrDefault(id, List.of()));
             getConfig().set(path + ".history-secondary", secondaryHistory.getOrDefault(id, List.of()));
+            getConfig().set(path + ".display-enabled", displayEnabled.getOrDefault(id, true));
         }
         saveConfig();
     }
@@ -128,6 +131,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("conf")) return configCommand(sender, args);
+        if (command.getName().equalsIgnoreCase("toggledisplay")) return toggleDisplay(sender);
         if (command.getName().equalsIgnoreCase("resetcooldown")) return resetCooldownCommand(sender, args);
         if (command.getName().equalsIgnoreCase("resetcraft")) return resetCraftCommand(sender, args);
         if (command.getName().equalsIgnoreCase("item")) return itemCommand(sender, args);
@@ -231,6 +235,15 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         List<String> history = historyMap.computeIfAbsent(playerId, ignored -> new ArrayList<>());
         history.add(effect + ":" + isAugmented + ":" + System.currentTimeMillis());
         while (history.size() > 30) history.remove(0);
+    }
+
+    private boolean toggleDisplay(CommandSender sender) {
+        if (!(sender instanceof Player player)) { tell(sender, "player-only"); return true; }
+        boolean enabled = !displayEnabled.getOrDefault(player.getUniqueId(), true);
+        displayEnabled.put(player.getUniqueId(), enabled);
+        saveData();
+        player.sendMessage(mini.deserialize("<green>Infuse HUD " + (enabled ? "enabled" : "disabled") + "."));
+        return true;
     }
 
     private boolean resetCooldownCommand(CommandSender sender, String[] args) {
@@ -958,6 +971,22 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
         }, 0L, 20L);
     }
 
+    private String displaySlot(UUID playerId, int index) {
+        String[] current = slots(playerId);
+        String effect = current[index];
+        if (effect == null || effect.isBlank()) return (index == 0 ? "Primary" : "Secondary") + ": <dark_gray>None";
+        String key = playerId + ":" + effect;
+        long now = System.currentTimeMillis();
+        String status;
+        long activeUntil = sparkEnds.getOrDefault(key, 0L);
+        long cooldownUntil = cooldowns.getOrDefault(key, 0L);
+        if (activeUntil > now) status = "<green>Active";
+        else if (cooldownUntil > now) status = "<red>" + ((cooldownUntil - now + 999) / 1000) + "s";
+        else status = "<green>Ready";
+        String color = getConfig().getString("effects." + effect + ".color", "#A855F7");
+        return "<" + color + ">" + (index == 0 ? "P" : "S") + ": " + title(effect) + " <dark_gray>[" + status + "<dark_gray>]";
+    }
+
     private void applyOceanAura() {
         long now = System.currentTimeMillis();
         Set<UUID> affected = new HashSet<>();
@@ -1107,6 +1136,11 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
             } else if (invisiblePlayers.remove(player.getUniqueId())) {
                 player.setCollidable(true);
                 for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
+            }
+            if (displayEnabled.getOrDefault(player.getUniqueId(), true)) {
+                String primaryText = displaySlot(player.getUniqueId(), 0);
+                String secondaryText = displaySlot(player.getUniqueId(), 1);
+                player.sendActionBar(mini.deserialize("<gray>✦ <white>" + primaryText + " <dark_gray>│ <white>" + secondaryText));
             }
             if (active.contains("ender")) {
                 for (Player other : player.getWorld().getPlayers()) {
