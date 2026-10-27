@@ -1465,6 +1465,7 @@ public final class Infuse extends JavaPlugin {
         saveData();
         invisiblePlayers.remove(id);
         windCharges.remove(id);
+        windChargeCooldowns.remove(id);
         victim.setCollidable(true);
         for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, victim);
         var maxHealth = victim.getAttribute(Attribute.MAX_HEALTH);
@@ -1735,13 +1736,20 @@ public final class Infuse extends JavaPlugin {
                 break;
             }
         }
-        int charges = windCharges.getOrDefault(player.getUniqueId(), 0);
-        if (charges > 0 && !disabled(player)) {
-            windCharges.put(player.getUniqueId(), charges - 1);
+        UUID playerId = player.getUniqueId();
+        int charges = windCharges.getOrDefault(playerId, 0);
+        long cooldownUntil = windChargeCooldowns.getOrDefault(playerId, 0L);
+        if (charges > 0 && !disabled(player) && cooldownUntil <= System.currentTimeMillis()) {
+            windCharges.put(playerId, charges - 1);
             org.bukkit.entity.WindCharge charge = player.getWorld().spawn(player.getEyeLocation(), org.bukkit.entity.WindCharge.class);
             charge.setShooter(player);
-            charge.setVelocity(player.getLocation().getDirection().multiply(2.0));
+            charge.setVelocity(player.getLocation().getDirection().multiply(
+                    getConfig().getDouble("effects.feather.wind-charge-speed", 2.0)));
+            windChargeCooldowns.put(playerId, System.currentTimeMillis()
+                    + Math.max(0, getConfig().getLong("effects.feather.wind-charge-cooldown-seconds", 5)) * 1000L);
             player.playSound(player.getLocation(), "entity.wind_charge.throw", 1.0f, 1.0f);
+        } else if (charges > 0 && cooldownUntil > System.currentTimeMillis()) {
+            player.sendMessage(mini.deserialize("<gray>Your Feather wind charge is recharging."));
         }
     }
 
