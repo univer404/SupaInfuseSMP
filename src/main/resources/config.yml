@@ -12,9 +12,9 @@ settings:
   roll-first-join: false
   head-drop: false
   resource-pack:
-    enabled: false
-    url: ""
-    sha1: ""
+    enabled: true
+    url: "https://raw.githubusercontent.com/o-hex/InfuseS3/main/_texturepack.zip"
+    sha1: "2a4079e2f08424192e4ee8b8d3df26d1f386cd15"
     prompt: "Infuse includes custom textures. Download the official resource pack to see them."
 effects:
   emerald:
