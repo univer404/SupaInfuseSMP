@@ -1,6 +1,6 @@
-package com.catadmirer.infuseSMP.util.regions;
+package com.supainfuse.smp.util.regions;
 
-import com.catadmirer.infuseSMP.Infuse;
+import com.supainfuse.smp.Infuse;
 
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
