@@ -418,8 +418,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     public void onEffectPotionConsume(org.bukkit.event.player.PlayerItemConsumeEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
-        if (item == null || !item.hasItemMeta()) return;
-        String encoded = item.getItemMeta().getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
+        if (item == null) return;
+        String encoded = item.hasItemMeta() ? item.getItemMeta().getPersistentDataContainer().get(effectKey, PersistentDataType.STRING) : null;
         if (encoded == null) {
             String[] activeSlots = slots(player.getUniqueId());
             if (Arrays.asList(activeSlots).contains("heart")) {
