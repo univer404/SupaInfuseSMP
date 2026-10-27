@@ -60,6 +60,8 @@ public final class Infuse extends JavaPlugin {
     private final Map<UUID, org.bukkit.scheduler.BukkitTask> hasteResetTasks = new HashMap<>();
     private final Map<UUID, Double> speedStacks = new HashMap<>();
     private final Map<UUID, org.bukkit.attribute.AttributeModifier> speedModifiers = new HashMap<>();
+    private final Map<UUID, org.bukkit.attribute.AttributeModifier> frostSpeedModifiers = new HashMap<>();
+    private final Map<UUID, org.bukkit.attribute.AttributeModifier> frostKnockbackModifiers = new HashMap<>();
     private final Map<String, Long> sparkEnds = new HashMap<>();
     private final Map<UUID, Long> trustActionCooldowns = new HashMap<>();
     private final Set<UUID> invisiblePlayers = new HashSet<>();
@@ -808,7 +810,7 @@ public final class Infuse extends JavaPlugin {
             if (Arrays.asList(activeSlots).contains("heart")) {
                 boolean goldenApple = item.getType() == Material.ENCHANTED_GOLDEN_APPLE;
                 int amplifier = Math.max(0, getConfig().getInt(goldenApple ? "effects.heart.egap-absorption-tier" : "effects.heart.food-absorption-tier", goldenApple ? 4 : 0));
-                int duration = getConfig().getInt("effects.heart.food-absorption-duration-ticks", 1200);
+                int duration = getConfig().getInt(goldenApple ? "effects.heart.egap-absorption-duration-ticks" : "effects.heart.food-absorption-duration-ticks", 1200);
                 player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, duration, amplifier, true, false, true));
             }
             if (Arrays.asList(activeSlots).contains("emerald")) {
@@ -1285,6 +1287,39 @@ public final class Infuse extends JavaPlugin {
         return "<" + color + ">" + (index == 0 ? "P" : "S") + ": " + title(effect) + " <dark_gray>[" + status + "<dark_gray>]";
     }
 
+    private void updateFrostModifiers(Player player, boolean onIceOrSnow) {
+        UUID id = player.getUniqueId();
+        var movement = player.getAttribute(Attribute.MOVEMENT_SPEED);
+        var knockback = player.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        if (onIceOrSnow) {
+            boolean sparkActive = sparkEnds.getOrDefault(id + ":frost", 0L) > System.currentTimeMillis();
+            double speedMultiplier = Math.max(1.0, getConfig().getDouble(
+                    sparkActive ? "effects.frost.spark-move-speed" : "effects.frost.move-speed", sparkActive ? 2.0 : 1.5));
+            if (movement != null) {
+                org.bukkit.attribute.AttributeModifier previous = frostSpeedModifiers.remove(id);
+                if (previous != null) movement.removeModifier(previous);
+                org.bukkit.attribute.AttributeModifier modifier = new org.bukkit.attribute.AttributeModifier(
+                        new NamespacedKey(this, "frost_speed_" + id), speedMultiplier - 1.0,
+                        org.bukkit.attribute.AttributeModifier.Operation.MULTIPLY_SCALAR_1);
+                movement.addModifier(modifier);
+                frostSpeedModifiers.put(id, modifier);
+            }
+            if (knockback != null && !frostKnockbackModifiers.containsKey(id)) {
+                org.bukkit.attribute.AttributeModifier modifier = new org.bukkit.attribute.AttributeModifier(
+                        new NamespacedKey(this, "frost_knockback_" + id),
+                        Math.max(0.0, Math.min(1.0, getConfig().getDouble("effects.frost.knockback-resistance", 0.3))),
+                        org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER);
+                knockback.addModifier(modifier);
+                frostKnockbackModifiers.put(id, modifier);
+            }
+        } else {
+            org.bukkit.attribute.AttributeModifier speed = frostSpeedModifiers.remove(id);
+            if (movement != null && speed != null) movement.removeModifier(speed);
+            org.bukkit.attribute.AttributeModifier resistance = frostKnockbackModifiers.remove(id);
+            if (knockback != null && resistance != null) knockback.removeModifier(resistance);
+        }
+    }
+
     private void applyOceanAura() {
         long now = System.currentTimeMillis();
         Set<UUID> affected = new HashSet<>();
@@ -1306,7 +1341,9 @@ public final class Infuse extends JavaPlugin {
                 int remaining = oceanAir.getOrDefault(targetId, maxAir) - 1;
                 if (remaining <= 0) {
                     remaining = 0;
-                    target.damage(getConfig().getDouble("effects.ocean.drown-damage", 1.0), caster);
+                    double drownDamage = getConfig().getDouble("effects.ocean.drown-damage", 2.0);
+                    if (target.getWorld().hasStorm()) drownDamage *= getConfig().getDouble("effects.ocean.rain-damage-multiplier", 2.0);
+                    target.damage(drownDamage, caster);
                 }
                 oceanAir.put(targetId, remaining);
                 oceanLastActive.put(targetId, now);
@@ -1392,6 +1429,7 @@ public final class Infuse extends JavaPlugin {
                     player.setCollidable(true);
                     for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
                 }
+                updateFrostModifiers(player, false);
                 if (fireGlidingPlayers.remove(player.getUniqueId())) {
                     ItemStack chest = player.getInventory().getChestplate();
                     if (chest == null || chest.getType() != Material.ELYTRA) player.setGliding(false);
@@ -1437,11 +1475,20 @@ public final class Infuse extends JavaPlugin {
                 player.setFreezeTicks(0);
                 Material feet = player.getLocation().getBlock().getType();
                 Material underfoot = player.getLocation().clone().subtract(0, 1, 0).getBlock().getType();
-                if (feet.name().contains("ICE") || underfoot.name().contains("ICE") || feet.name().contains("SNOW") || underfoot.name().contains("SNOW")) {
-                    player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, true, false, true));
-                    player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 0, true, false, true));
-                }
+                boolean onIceOrSnow = feet.name().contains("ICE") || underfoot.name().contains("ICE")
+                        || feet.name().contains("SNOW") || underfoot.name().contains("SNOW");
+                updateFrostModifiers(player, onIceOrSnow);
+                if (onIceOrSnow) player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 0, true, false, true));
                 if (feet == Material.POWDER_SNOW) player.setVelocity(player.getVelocity().setY(Math.max(0.1, player.getVelocity().getY())));
+                if (getConfig().getBoolean("effects.frost.lava-walk", true)) {
+                    org.bukkit.block.Block lava = player.getLocation().clone().subtract(0, 1, 0).getBlock();
+                    if (lava.getType() == Material.LAVA) {
+                        boolean source = !(lava.getBlockData() instanceof org.bukkit.block.data.Levelled levelled) || levelled.getLevel() == 0;
+                        lava.setType(source ? Material.OBSIDIAN : Material.COBBLESTONE, false);
+                    }
+                }
+            } else {
+                updateFrostModifiers(player, false);
             }
             if (active.contains("heart")) {
                 var attribute = player.getAttribute(Attribute.MAX_HEALTH);
