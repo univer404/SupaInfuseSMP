@@ -738,10 +738,38 @@ public final class Infuse extends JavaPlugin {
 
     @EventHandler
     public void invisibilityRangedHit(org.bukkit.event.entity.ProjectileHitEvent event) {
-        if (!(event.getEntity().getShooter() instanceof Player shooter) || !(event.getHitEntity() instanceof org.bukkit.entity.LivingEntity target) || disabled(shooter)) return;
-        if (!Arrays.asList(slots(shooter.getUniqueId())).contains("invisibility")) return;
-        if (target instanceof Player victim && trustManager.getTrusted(shooter.getUniqueId()).contains(victim.getUniqueId())) return;
-        target.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 200, 0, true, false, true));
+        if (!(event.getEntity().getShooter() instanceof Player shooter) ||
+                !(event.getHitEntity() instanceof org.bukkit.entity.LivingEntity target) || disabled(shooter)) return;
+        if (target instanceof Player victim && trustManager.isTrusted(shooter.getUniqueId(), victim.getUniqueId())) return;
+        List<String> active = Arrays.asList(slots(shooter.getUniqueId()));
+        if (active.contains("invisibility")) {
+            target.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS,
+                    Math.max(1, getConfig().getInt("effects.invisibility.blindness-duration-ticks", 200)), 0, true, false, true));
+        }
+        if (active.contains("fire")) {
+            boolean sparkActive = sparkEnds.getOrDefault(shooter.getUniqueId() + ":fire", 0L) > System.currentTimeMillis();
+            int burnTicks = getConfig().getInt(sparkActive ? "effects.fire.eternal-ticks" : "effects.fire.ignite-ticks", sparkActive ? 32767 : 100);
+            target.setFireTicks(Math.max(target.getFireTicks(), burnTicks));
+            target.getWorld().spawnParticle(org.bukkit.Particle.FLAME, target.getLocation().add(0, 1, 0), 8, 0.25, 0.35, 0.25, 0.02);
+        }
+        if (active.contains("frost")) {
+            target.setFreezeTicks(Math.max(target.getFreezeTicks(), getConfig().getInt("effects.frost.freeze-ticks", 600)));
+            target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE,
+                    Math.max(1, getConfig().getInt("effects.frost.mining-fatigue-duration-ticks", 200)),
+                    Math.max(0, getConfig().getInt("effects.frost.mining-fatigue-amplifier", 1)), true, false, true));
+        }
+    }
+
+    public void onProjectileShoot(org.bukkit.event.entity.EntityShootBowEvent event) {
+        if (!(event.getEntity() instanceof Player shooter) || disabled(shooter)) return;
+        List<String> active = Arrays.asList(slots(shooter.getUniqueId()));
+        if (active.contains("speed")) {
+            double multiplier = getConfig().getDouble("effects.speed.projectile-speed-multiplier", 1.2);
+            event.getProjectile().setVelocity(event.getProjectile().getVelocity().multiply(multiplier));
+        }
+        if (active.contains("strength") && event.getProjectile() instanceof org.bukkit.entity.AbstractArrow arrow) {
+            arrow.setPierceLevel(4);
+        }
     }
 
     @EventHandler
@@ -756,10 +784,15 @@ public final class Infuse extends JavaPlugin {
                 player.getWorld().strikeLightning(hitLocation);
             }
         }
-        if (Arrays.asList(slots(player.getUniqueId())).contains("ocean") && event.getHitEntity() instanceof Player target &&
-                !trustManager.getTrusted(player.getUniqueId()).contains(target.getUniqueId())) {
-            org.bukkit.util.Vector pull = player.getLocation().toVector().subtract(target.getLocation().toVector()).normalize().multiply(getConfig().getDouble("effects.ocean.trident-pull-coefficient", 0.27));
-            target.setVelocity(target.getVelocity().add(pull));
+        if (Arrays.asList(slots(player.getUniqueId())).contains("ocean") &&
+                event.getHitEntity() instanceof org.bukkit.entity.LivingEntity target &&
+                !(target instanceof Player trustedTarget && trustManager.isTrusted(player.getUniqueId(), trustedTarget.getUniqueId()))) {
+            org.bukkit.util.Vector direction = player.getLocation().toVector().subtract(target.getLocation().toVector()).normalize();
+            double distance = player.getLocation().distance(target.getLocation());
+            double pull = Math.min(getConfig().getDouble("effects.ocean.trident-pull-cap", 16.0),
+                    distance * getConfig().getDouble("effects.ocean.trident-pull-coefficient", 0.27)
+                            + getConfig().getDouble("effects.ocean.trident-pull-offset", 1.5));
+            target.setVelocity(target.getVelocity().add(direction.multiply(pull / 10.0)));
         }
     }
 
@@ -1260,8 +1293,11 @@ public final class Infuse extends JavaPlugin {
             double radius = getConfig().getDouble("effects.ocean.passive-radius", 4.0);
             for (Player target : caster.getWorld().getPlayers()) {
                 if (target.equals(caster) || disabled(target) || target.getLocation().distanceSquared(caster.getLocation()) > radius * radius) continue;
-                if (trustManager.getTrusted(caster.getUniqueId()).contains(target.getUniqueId())) continue;
-                if (target.getEyeLocation().getBlock().isLiquid() == false || target.hasPotionEffect(PotionEffectType.WATER_BREATHING)) continue;
+                if (trustManager.isTrusted(caster.getUniqueId(), target.getUniqueId())) {
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, 60, 0, true, false, true));
+                    continue;
+                }
+                if (!target.getEyeLocation().getBlock().isLiquid() || target.hasPotionEffect(PotionEffectType.WATER_BREATHING)) continue;
                 UUID targetId = target.getUniqueId();
                 int respiration = 0;
                 ItemStack helmet = target.getInventory().getHelmet();
@@ -1394,6 +1430,8 @@ public final class Infuse extends JavaPlugin {
             if (active.contains("ocean")) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, 40, 0, true, false, true));
                 if (player.isInWater()) player.addPotionEffect(new PotionEffect(PotionEffectType.DOLPHINS_GRACE, 40, 0, true, false, true));
+                ItemStack heldItem = player.getInventory().getItemInMainHand();
+                if (heldItem.getType() == Material.TRIDENT) applyToolEnchant(heldItem, enchantment("loyalty"), 5);
             }
             if (active.contains("frost")) {
                 player.setFreezeTicks(0);
