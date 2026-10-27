@@ -1037,7 +1037,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 return effect == null || effect.isBlank() ? "" : title(effect);
             }
             case "effect_augmented_primary", "effect_augmented_secondary" -> {
-                return Boolean.toString(!effect.isBlank() && isAugmented[slot]);
+                return Boolean.toString(effect != null && !effect.isBlank() && isAugmented[slot]);
             }
             case "effect_icon_primary", "effect_icon_secondary" -> {
                 if (effect == null || effect.isBlank()) return "";
