@@ -929,7 +929,7 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 UUID targetId = target.getUniqueId();
                 int respiration = 0;
                 ItemStack helmet = target.getInventory().getHelmet();
-                if (helmet != null) respiration = helmet.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.OXYGEN);
+                if (helmet != null) respiration = (enchantment("respiration") == null ? 0 : helmet.getEnchantmentLevel(enchantment("respiration")));
                 int maxAir = 15 + respiration * 15;
                 int remaining = oceanAir.getOrDefault(targetId, maxAir) - 1;
                 if (remaining <= 0) {
