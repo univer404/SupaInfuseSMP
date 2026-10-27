@@ -62,6 +62,9 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     @Override public void onDisable() {
         if (passiveTask != null) passiveTask.cancel();
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            for (Player hidden : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, hidden);
+        }
         saveData();
     }
 
@@ -581,7 +584,16 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
                 var attribute = player.getAttribute(Attribute.MAX_HEALTH);
                 if (attribute != null && attribute.getBaseValue() == 30.0) attribute.setBaseValue(20.0);
             }
-            if (active.contains("invisibility")) player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, true, false, true));
+            if (active.contains("invisibility")) {
+                invisiblePlayers.add(player.getUniqueId());
+                player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, true, false, true));
+                for (Player viewer : Bukkit.getOnlinePlayers()) {
+                    if (viewer.equals(player) || trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(viewer.getUniqueId())) viewer.showPlayer(this, player);
+                    else viewer.hidePlayer(this, player);
+                }
+            } else if (invisiblePlayers.remove(player.getUniqueId())) {
+                for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(this, player);
+            }
             if (active.contains("ender")) {
                 for (Player other : player.getWorld().getPlayers()) {
                     if (other.equals(player) || trusted.getOrDefault(player.getUniqueId(), Set.of()).contains(other.getUniqueId())) continue;
@@ -676,7 +688,12 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
     }
 
     @EventHandler public void join(PlayerJoinEvent e) {
-        slots(e.getPlayer().getUniqueId());
+        Player joining = e.getPlayer();
+        slots(joining.getUniqueId());
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (invisiblePlayers.contains(online.getUniqueId()) && !trusted.getOrDefault(online.getUniqueId(), Set.of()).contains(joining.getUniqueId())) joining.hidePlayer(this, online);
+            if (invisiblePlayers.contains(joining.getUniqueId()) && !trusted.getOrDefault(joining.getUniqueId(), Set.of()).contains(online.getUniqueId())) online.hidePlayer(this, joining);
+        }
         String url=getConfig().getString("settings.resource-pack.url","");
         if(getConfig().getBoolean("settings.resource-pack.enabled") && !url.isBlank()) {
             String hash=getConfig().getString("settings.resource-pack.sha1","");
