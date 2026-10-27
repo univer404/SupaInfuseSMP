@@ -27,7 +27,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class InfusePlugin extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
-    static final List<String> EFFECTS = List.of("earth","emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
+    static final List<String> EFFECTS = List.of("emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
+    private static final List<String> ICON_EFFECTS = List.of("earth","emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
     private final MiniMessage mini = MiniMessage.miniMessage();
     private final Map<UUID, String[]> equipped = new HashMap<>();
     private final Map<UUID, boolean[]> augmented = new HashMap<>();
@@ -1132,8 +1133,8 @@ public final class InfusePlugin extends JavaPlugin implements Listener, CommandE
 
     private int effectIconCodePoint(String effect, boolean isAugmented) {
         int codePoint = 0xE000;
-        for (String currentEffect : EFFECTS) {
-            if (currentEffect.equals(effect)) {
+        for (String currentEffect : ICON_EFFECTS) {
+            if (currentEffect.equals(effect) || (currentEffect.equals("earth") && effect.equals("earth"))) {
                 if (currentEffect.equals("earth") || currentEffect.equals("ender")) return codePoint + 20;
                 return codePoint + (isAugmented ? 41 : 20);
             }
