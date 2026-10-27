@@ -724,7 +724,6 @@ public final class Infuse extends JavaPlugin {
     public String title(String effect) { return effect.substring(0,1).toUpperCase(Locale.ROOT)+effect.substring(1); }
     public String display(String effect) { return effect == null || effect.isBlank() ? "None" : title(effect); }
 
-    @EventHandler
     public void convertFireSnowballs(PlayerInteractEvent event) {
         if (event.getItem() == null || event.getItem().getType() != Material.SNOWBALL || !event.getAction().isRightClick()) return;
         Player player = event.getPlayer();
@@ -755,7 +754,6 @@ public final class Infuse extends JavaPlugin {
         player.playSound(player.getLocation(), "entity.blaze.shoot", 0.8f, 1.2f);
     }
 
-    @EventHandler
     public void invisibilityRangedHit(org.bukkit.event.entity.ProjectileHitEvent event) {
         if (!(event.getEntity().getShooter() instanceof Player shooter) ||
                 !(event.getHitEntity() instanceof org.bukkit.entity.LivingEntity target) || disabled(shooter)) return;
@@ -792,7 +790,6 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
-    @EventHandler
     public void infuseTridentEffects(org.bukkit.event.entity.ProjectileHitEvent event) {
         if (!(event.getEntity() instanceof org.bukkit.entity.Trident trident) || !(trident.getShooter() instanceof Player player) || disabled(player)) return;
         if (Arrays.asList(slots(player.getUniqueId())).contains("thunder")) {
@@ -834,7 +831,6 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
-    @EventHandler
     public void convertDragonBreath(PlayerInteractEvent event) {
         if (!event.getAction().isRightClick() || event.getItem() == null || event.getItem().getType() != Material.DRAGON_BREATH) return;
         Player player = event.getPlayer();
@@ -1056,7 +1052,6 @@ public final class Infuse extends JavaPlugin {
         to.giveExp(amount);
     }
 
-    @EventHandler
     public void onExperienceGain(org.bukkit.event.player.PlayerExpChangeEvent event) {
         if (disabled(event.getPlayer())) return;
         String[] activeSlots = slots(event.getPlayer().getUniqueId());
@@ -1146,7 +1141,7 @@ public final class Infuse extends JavaPlugin {
         return false;
     }
 
-    @EventHandler public void inventoryClick(InventoryClickEvent e) {
+    public void inventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         String title = mini.serialize(e.getView().title());
         if (title.contains("Infuse") && !title.contains("Choose an Effect")) {
@@ -1986,7 +1981,6 @@ public final class Infuse extends JavaPlugin {
         applyOceanAura();
     }
 
-    @EventHandler
     public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
         Player victim = event.getEntity();
         Player killer = victim.getKiller();
@@ -2038,7 +2032,7 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
-    @EventHandler public void environmentalDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+    public void environmentalDamage(org.bukkit.event.entity.EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player) || disabled(player)) return;
         String[] active = slots(player.getUniqueId());
         if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL && Arrays.asList(active).contains("feather")) event.setCancelled(true);
@@ -2058,13 +2052,11 @@ public final class Infuse extends JavaPlugin {
             }
         }
     }
-    @EventHandler
     public void invisibilityMobTarget(org.bukkit.event.entity.EntityTargetLivingEntityEvent event) {
         if (!(event.getTarget() instanceof Player target) || disabled(target)) return;
         if (Arrays.asList(slots(target.getUniqueId())).contains("invisibility")) event.setCancelled(true);
     }
 
-    @EventHandler
     public void invisibilityPotionImmunity(org.bukkit.event.entity.EntityPotionEffectEvent event) {
         if (!(event.getEntity() instanceof Player player) || disabled(player) || event.getNewEffect() == null) return;
         if (!Arrays.asList(slots(player.getUniqueId())).contains("invisibility")) return;
@@ -2072,7 +2064,7 @@ public final class Infuse extends JavaPlugin {
         if (type == PotionEffectType.WITHER || type == PotionEffectType.DARKNESS) event.setCancelled(true);
     }
 
-    @EventHandler public void damage(EntityDamageByEntityEvent event) {
+    public void damage(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player attacker) || disabled(attacker)) return;
         if (!(event.getEntity() instanceof org.bukkit.entity.LivingEntity target)) return;
         boolean trustedTarget = target instanceof Player victim && trustManager.getTrusted(attacker.getUniqueId()).contains(victim.getUniqueId());
@@ -2280,19 +2272,19 @@ public final class Infuse extends JavaPlugin {
         hitCounters.put(key, count);
         return count;
     }
-    @EventHandler public void dropControl(PlayerDropItemEvent event) {
+    public void dropControl(PlayerDropItemEvent event) {
         Player player = event.getPlayer();
         String action = player.isSneaking() ? "sneak-drop" : "drop";
         triggerBoundSpark(player, action, event);
     }
 
-    @EventHandler public void swapControl(PlayerSwapHandItemsEvent event) {
+    public void swapControl(PlayerSwapHandItemsEvent event) {
         Player player = event.getPlayer();
         String action = player.isSneaking() ? "sneak-swap" : "swap";
         triggerBoundSpark(player, action, event);
     }
 
-    @EventHandler public void sneakControl(PlayerToggleSneakEvent event) {
+    public void sneakControl(PlayerToggleSneakEvent event) {
         if (!event.isSneaking()) return;
         Player player = event.getPlayer();
         String[] configured = controls.getOrDefault(player.getUniqueId(), new String[]{"none", "none"});
@@ -2330,7 +2322,6 @@ public final class Infuse extends JavaPlugin {
         }
     }
 
-    @EventHandler
     public void quit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         stopInvisibilitySpark(player);
@@ -2370,7 +2361,7 @@ public final class Infuse extends JavaPlugin {
         clearHasteSpark(player);
     }
 
-    @EventHandler public void join(PlayerJoinEvent e) {
+    public void join(PlayerJoinEvent e) {
         Player joining = e.getPlayer();
         slots(joining.getUniqueId());
         if (!joining.hasPlayedBefore() && getConfig().getBoolean("settings.roll-first-join", false)) {
