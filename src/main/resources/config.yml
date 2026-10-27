@@ -3,6 +3,7 @@ settings:
     - disabled_world
   allow-same-effects: false
   allow-true-damage: true
+  overwrite-enchants: true
   lock-effects: false
   primary-effects: [heart, strength, regeneration, haste, invisibility, frost, thunder, feather]
   secondary-effects: [speed, fire, ocean, emerald]
