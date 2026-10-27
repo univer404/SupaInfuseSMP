@@ -5,6 +5,11 @@ import com.catadmirer.infuseSMP.gui.InfuseGui;
 import com.catadmirer.infuseSMP.gui.RecipeBookGui;
 import com.catadmirer.infuseSMP.util.regions.WorldGuardRegionManager;
 import com.catadmirer.infuseSMP.expansions.InfusePlaceholders;
+import com.catadmirer.infuseSMP.commands.InfuseCommandHandler;
+import com.catadmirer.infuseSMP.listeners.DamageListener;
+import com.catadmirer.infuseSMP.listeners.EffectItemListener;
+import com.catadmirer.infuseSMP.listeners.PlayerLifecycleListener;
+import com.catadmirer.infuseSMP.listeners.SparkControlListener;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -31,7 +36,7 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class Infuse extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
+public final class Infuse extends JavaPlugin {
     static final List<String> EFFECTS = List.of("emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
     private static final List<String> ICON_EFFECTS = List.of("earth","emerald","ender","feather","fire","frost","haste","heart","invisibility","ocean","regeneration","speed","strength","thunder");
     private final MiniMessage mini = MiniMessage.miniMessage();
@@ -74,11 +79,21 @@ public final class Infuse extends JavaPlugin implements Listener, CommandExecuto
         recipeGui = new RecipeBookGui(this);
         if (Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) regionManager = new WorldGuardRegionManager(this);
         loadData();
-        Objects.requireNonNull(getCommand("infuse")).setExecutor(this);
-        Objects.requireNonNull(getCommand("infuse")).setTabCompleter(this);
-        Objects.requireNonNull(getCommand("trust")).setExecutor(this);
-        Objects.requireNonNull(getCommand("trust")).setTabCompleter(this);
-        getServer().getPluginManager().registerEvents(this, this);
+        InfuseCommandHandler commandHandler = new InfuseCommandHandler(this);
+        for (String commandName : List.of("infuse", "trust", "use", "swap", "recipes", "control", "item",
+                "ldrain", "rdrain", "conf", "mapregion", "toggledisplay", "resetcraft", "resetcooldown")) {
+            PluginCommand pluginCommand = getCommand(commandName);
+            if (pluginCommand == null) {
+                getLogger().warning("Command '" + commandName + "' is missing from plugin.yml.");
+                continue;
+            }
+            pluginCommand.setExecutor(commandHandler);
+            pluginCommand.setTabCompleter(commandHandler);
+        }
+        getServer().getPluginManager().registerEvents(new DamageListener(this), this);
+        getServer().getPluginManager().registerEvents(new EffectItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new PlayerLifecycleListener(this), this);
+        getServer().getPluginManager().registerEvents(new SparkControlListener(this), this);
         getServer().getPluginManager().registerEvents(new CraftingGui(this), this);
         getServer().getPluginManager().registerEvents(recipeGui, this);
         passiveTask = Bukkit.getScheduler().runTaskTimer(this, this::applyPassives, 20L, 20L);
@@ -151,7 +166,7 @@ public final class Infuse extends JavaPlugin implements Listener, CommandExecuto
         return regionManager != null && regionManager.isDisabled(p.getLocation());
     }
 
-    @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean handleCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("mapregion")) return mapRegionCommand(sender, args);
         if (command.getName().equalsIgnoreCase("conf")) return configCommand(sender, args);
         if (command.getName().equalsIgnoreCase("toggledisplay")) return toggleDisplay(sender);
@@ -1712,7 +1727,7 @@ public final class Infuse extends JavaPlugin implements Listener, CommandExecuto
             if(hash.matches("(?i)[0-9a-f]{40}")) e.getPlayer().setResourcePack(url, java.util.HexFormat.of().parseHex(hash), getConfig().getString("settings.resource-pack.prompt","Infuse resource pack"), false);
         }
     }
-    @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+    public List<String> completeCommand(CommandSender sender, Command command, String alias, String[] args) {
         if (command.getName().equalsIgnoreCase("resetcooldown")) return args.length == 1 ? List.of("primary", "secondary") : List.of();
         if (command.getName().equalsIgnoreCase("resetcraft")) return args.length == 1 ? java.util.stream.Stream.concat(EFFECTS.stream(), java.util.stream.Stream.of("all")).toList() : List.of();
         if (command.getName().equalsIgnoreCase("mapregion")) return args.length == 1 ? List.of("add", "delete", "list", "clear") : args.length == 2 && (args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("delete")) && sender instanceof Player player && regionManager != null ? regionManager.list().stream().map(value -> value.substring(value.indexOf('|') + 1)).toList() : List.of();
