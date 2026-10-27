@@ -22,8 +22,9 @@ The JAR is written to `target/Infuse.jar`. GitHub Actions builds the branch and 
 
 ## Texture pack
 
-The supplied upstream pack is not authored by SupaInfuseSMP, so its original author attribution is not changed. GitHub Actions creates a separate `Infuse-Texture-Pack-1.21.11` artifact by updating the pack metadata to format 75 and validating the ZIP. Download it from the successful build's **Artifacts** section. This metadata update does not prove every model, font glyph, or sound works in-game; those still require client testing. The plugin currently prompts players using the URL and SHA-1 in `src/main/resources/config.yml`, which must be changed to a stable HTTPS host for the generated pack before automatic delivery can use the updated ZIP.
+The updated Minecraft 1.21.11 pack is published as a stable release asset: `Infuse-Texture-Pack-1.21.11.zip`. Its SHA-1 is `c84941d094d95ca1c5f3429989aa8b26f377ce16`. The plugin configuration points to this hosted ZIP and prompts players to download it when they join.
 
+This update preserves the original pack assets and changes its `pack.mcmeta` from legacy `pack_format: 64` to `pack_format: 75`. That fixes the declared format metadata for Minecraft 1.21.11; it does **not** prove every custom model, font glyph, texture, or sound works correctly in-game. Test on a client before using it on a production server.
 ## Source layout
 
 The Java source follows the package-oriented layout used by the reference project, with one purpose per package:
