@@ -1,0 +1,27 @@
+name: Build Infuse
+on:
+  push:
+    branches: [main, "conversion/**"]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build plugin
+        run: mvn --batch-mode --no-transfer-progress clean package
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infuse-1.0.0
+          path: target/Infuse.jar
+          if-no-files-found: error
+          retention-days: 14
