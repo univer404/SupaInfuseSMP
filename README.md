@@ -1,6 +1,6 @@
 # Infuse — Paper/Purpur plugin conversion
 
-Java 21 conversion of the supplied InfuseS3 Skript pack for Paper/Purpur 1.21.11.
+Java conversion of the supplied InfuseS3 Skript pack for Paper/Purpur. Plugin author metadata is set to `universe404`.
 
 ## Build
 
@@ -10,7 +10,7 @@ Requires JDK 21 and Maven:
 mvn --batch-mode clean package
 ```
 
-The JAR is written to `target/Infuse.jar`. GitHub Actions builds the branch and publishes a downloadable workflow artifact. The build also validates the configured resource-pack HTTPS URL, SHA-1, ZIP integrity, and `pack.mcmeta` so broken or changed hosting is caught by CI.
+The JAR is written to `target/Infuse.jar`. GitHub Actions builds the branch and publishes a downloadable workflow artifact. The build prepares a Minecraft Java 26.3 resource pack, publishes it as a stable release asset, computes its SHA-1, injects the matching URL/checksum into the packaged plugin config, then builds the plugin.
 
 ## Install
 
@@ -22,9 +22,9 @@ The JAR is written to `target/Infuse.jar`. GitHub Actions builds the branch and 
 
 ## Texture pack
 
-The updated Minecraft 1.21.11 pack is published as a stable release asset: `Infuse-Texture-Pack-1.21.11.zip`. Its SHA-1 is `c84941d094d95ca1c5f3429989aa8b26f377ce16`. The plugin configuration points to this hosted ZIP and prompts players to download it when they join.
+The Minecraft Java 26.3 pack is published as a stable release asset: `Infuse-Texture-Pack-26.3.zip` at the `tpack-26.3` release. The build computes the exact SHA-1 for the generated ZIP and injects it into the packaged plugin config, so the resource-pack URL and checksum stay matched.
 
-This update preserves the original pack assets and changes its `pack.mcmeta` from legacy `pack_format: 64` to `pack_format: 75`. That fixes the declared format metadata for Minecraft 1.21.11; it does **not** prove every custom model, font glyph, texture, or sound works correctly in-game. Test on a client before using it on a production server.
+The pack metadata targets Minecraft Java 26.3 resource-pack format 97.1 using `min_format: [97, 1]` and `max_format: [97, 1]`. This updates compatibility metadata only; it does **not** migrate assets whose model, font, texture, or sound formats changed between releases. Test on a 26.3 client and inspect missing-texture/font/model warnings before using it on a production server.
 ## Source layout
 
 The Java source follows the package-oriented layout used by the reference project, with one purpose per package:
