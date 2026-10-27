@@ -77,6 +77,8 @@ effects:
     spark-seconds: 15
     craft-limit: -1
     augment-limit: 0
+    attack-speed-stack: 0.2
+    iframe-duration: 19
   heart:
     color: "#FC0046"
     cooldown-seconds: 120
