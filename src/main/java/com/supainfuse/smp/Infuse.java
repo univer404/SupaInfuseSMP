@@ -17,6 +17,7 @@ import com.supainfuse.smp.listeners.PlayerLifecycleListener;
 import com.supainfuse.smp.listeners.SparkControlListener;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Registry;
@@ -1179,15 +1180,19 @@ public final class Infuse extends JavaPlugin implements Listener {
         return false;
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void inventoryClick(InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player p)) return;
         Inventory top = e.getView().getTopInventory();
-        // Identify our menus by the actual Inventory instance, not its title.
-        // Cancel every click in the view, including shift-clicks, number keys,
-        // offhand swaps, double-click collection, and clicks in the player inventory.
-        if (!infuseMenus.contains(top)) return;
+        String title = PlainTextComponentSerializer.plainText().serialize(e.getView().title());
+        boolean infuseMenu = infuseMenus.contains(top)
+                || title.equalsIgnoreCase("Infuse")
+                || title.equalsIgnoreCase("Choose an Effect");
+        if (!infuseMenu) return;
+        // Cancel before any menu logic. This blocks moving menu icons into the
+        // player inventory, shift-click transfers, hotbar swaps, offhand swaps,
+        // double-click collection and clicks on filler panes.
         e.setCancelled(true);
+        if (!(e.getWhoClicked() instanceof Player p)) return;
         int rawSlot = e.getRawSlot();
         if (rawSlot < 0 || rawSlot >= top.getSize()) return;
         if (top.getSize() == 27) {
@@ -1213,9 +1218,14 @@ public final class Infuse extends JavaPlugin implements Listener {
         infuseMenus.remove(e.getInventory());
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void inventoryDrag(InventoryDragEvent e) {
-        if (infuseMenus.contains(e.getView().getTopInventory())) e.setCancelled(true);
+        String title = PlainTextComponentSerializer.plainText().serialize(e.getView().title());
+        if (infuseMenus.contains(e.getView().getTopInventory())
+                || title.equalsIgnoreCase("Infuse")
+                || title.equalsIgnoreCase("Choose an Effect")) {
+            e.setCancelled(true);
+        }
     }
 
     private void spark(Player p) {
