@@ -1,0 +1,122 @@
+name: Build Infuse
+on:
+  push:
+    branches: [main, "conversion/**"]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Prepare Minecraft 26.3 texture pack
+        id: pack
+        run: |
+          python - <<'PY'
+          import hashlib, io, json, os, urllib.request, zipfile
+          source_url = "https://github.com/univer404/SupaInfuseSMP/releases/download/tpack-1.21.11/Infuse-Texture-Pack-1.21.11.zip"
+          request = urllib.request.Request(source_url, headers={"User-Agent": "SupaInfuseSMP-pack-builder"})
+          with urllib.request.urlopen(request, timeout=60) as response:
+              original = response.read()
+          original_sha1 = hashlib.sha1(original).hexdigest()
+          expected_source_sha1 = "c84941d094d95ca1c5f3429989aa8b26f377ce16"
+          if original_sha1 != expected_source_sha1:
+              raise SystemExit(f"Published source pack checksum mismatch: expected {expected_source_sha1}, got {original_sha1}")
+          with zipfile.ZipFile(io.BytesIO(original)) as source:
+              bad = source.testzip()
+              if bad:
+                  raise SystemExit(f"Source pack has corrupt entry: {bad}")
+              if "pack.mcmeta" not in source.namelist():
+                  raise SystemExit("Source texture pack is missing root pack.mcmeta.")
+              metadata = json.loads(source.read("pack.mcmeta"))
+              pack = metadata.setdefault("pack", {})
+              old_format = {key: pack.get(key) for key in ("pack_format", "min_format", "max_format") if key in pack}
+              # Minecraft Java 26.3 uses resource-pack format 97.1.
+              # Use modern range metadata (required for format 65+) rather than legacy pack_format.
+              pack.pop("pack_format", None)
+              pack.pop("supported_formats", None)
+              pack["min_format"] = [97, 1]
+              pack["max_format"] = [97, 1]
+              pack["description"] = "InfuseSMP resource pack for Minecraft Java 26.3"
+              output = io.BytesIO()
+              with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
+                  for info in source.infolist():
+                      data = source.read(info.filename)
+                      if info.filename == "pack.mcmeta":
+                          data = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
+                      target.writestr(info, data)
+          result = output.getvalue()
+          with zipfile.ZipFile(io.BytesIO(result)) as check:
+              bad = check.testzip()
+              if bad:
+                  raise SystemExit(f"Generated pack has corrupt entry: {bad}")
+              checked = json.loads(check.read("pack.mcmeta"))["pack"]
+              if checked.get("min_format") != [97, 1] or checked.get("max_format") != [97, 1]:
+                  raise SystemExit("Generated pack metadata does not declare Minecraft 26.3 format 97.1.")
+          os.makedirs("target", exist_ok=True)
+          output_path = "target/Infuse-Texture-Pack-26.3.zip"
+          with open(output_path, "wb") as f:
+              f.write(result)
+          sha1 = hashlib.sha1(result).hexdigest()
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"sha1={sha1}\n")
+          print(f"Updated metadata: {old_format} -> min_format/max_format [97, 1].")
+          print(f"NEW_PACK_SHA1={sha1}")
+          print(f"Output: {output_path} ({len(result)} bytes)")
+          print("Note: metadata compatibility is not a substitute for live testing of models, fonts, textures, and sounds.")
+          PY
+      - name: Set packaged resource-pack URL and checksum
+        env:
+          PACK_SHA1: ${{ steps.pack.outputs.sha1 }}
+        run: |
+          python - <<'PY'
+          import os, re
+          path = "src/main/resources/config.yml"
+          with open(path, encoding="utf-8") as file:
+              content = file.read()
+          url = "https://github.com/univer404/SupaInfuseSMP/releases/download/tpack-26.3/Infuse-Texture-Pack-26.3.zip"
+          content, url_count = re.subn(r'(?m)^(    url:)\s*"[^"]+"$', lambda m: f'{m.group(1)} "{url}"', content, count=1)
+          content, sha_count = re.subn(r'(?m)^(    sha1:)\s*"[^"]+"$', lambda m: f'{m.group(1)} "{os.environ["PACK_SHA1"]}"', content, count=1)
+          if url_count != 1 or sha_count != 1 or not re.fullmatch(r"[0-9a-f]{40}", os.environ["PACK_SHA1"]):
+              raise SystemExit("Could not safely update resource-pack URL/checksum in config.yml.")
+          with open(path, "w", encoding="utf-8") as file:
+              file.write(content)
+          print(f"Packaged config points to {url} with SHA-1 {os.environ['PACK_SHA1']}")
+          PY
+      - name: Upload updated texture pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infuse-Texture-Pack-26.3
+          path: target/Infuse-Texture-Pack-26.3.zip
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish stable texture pack release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="tpack-26.3"
+          asset="target/Infuse-Texture-Pack-26.3.zip"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$asset" --clobber
+          else
+            gh release create "$tag" "$asset" \
+              --target "$GITHUB_SHA" \
+              --title "Infuse Texture Pack for Minecraft Java 26.3" \
+              --notes "Pack metadata targets Minecraft Java 26.3 resource-pack format 97.1. Original pack assets are preserved. This metadata update does not itself migrate changed model/font/texture formats; client-side testing is still required."
+          fi
+      - name: Build plugin
+        run: mvn --batch-mode --no-transfer-progress clean package
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infuse-1.0.0
+          path: target/Infuse.jar
+          if-no-files-found: error
+          retention-days: 14

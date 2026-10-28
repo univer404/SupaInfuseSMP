@@ -1,0 +1,72 @@
+name: Infuse
+version: 1.0.0
+main: com.supainfuse.smp.Infuse
+api-version: '1.21'
+authors: [universe404]
+description: Java implementation of the Infuse effects system.
+softdepend: [PlaceholderAPI, WorldGuard, Geyser-Spigot, floodgate]
+commands:
+  infuse:
+    description: Open Infuse and manage equipped effects.
+    usage: /infuse [gui|give|reload|trust]
+    aliases: [infuses]
+  trust:
+    description: Manage players trusted by your Infuse effects.
+    usage: /trust <add|remove|list|clear> [player]
+    aliases: [untrust]
+  use:
+    description: Activate the Spark in one of your Infuse slots.
+    usage: /use <primary|secondary>
+    aliases: [u, a, activate]
+  swap:
+    description: Swap your primary and secondary Infuse effects.
+    usage: /swap
+    aliases: [swapeff, swapeffects, swapslots]
+  recipes:
+    description: View Infuse crafting guidance.
+    usage: /recipes
+  control:
+    description: Bind primary or secondary Spark to a player action.
+    usage: /control <primary|secondary> <action>
+    aliases: [controls, controlset, bind]
+  item:
+    description: Give an Infuse effect potion.
+    usage: /item <effect|all> [true|false]
+    aliases: [giveitem, i, potion, pot]
+    permission: infuse.admin
+  ldrain:
+    description: Return the primary effect as an item.
+    usage: /ldrain
+    aliases: [pdrain]
+  rdrain:
+    description: Return the secondary effect as an item.
+    usage: /rdrain
+    aliases: [sdrain]
+  conf:
+    description: Read and update Infuse configuration values.
+    usage: /conf <get|set|list> ...
+    permission: infuse.admin
+  mapregion:
+    description: Disable Infuse inside selected WorldGuard regions.
+    usage: /mapregion <add|delete|list|clear> [region-id]
+    permission: infuse.admin
+  toggledisplay:
+    description: Toggle the Infuse HUD.
+    usage: /toggledisplay
+    aliases: [td]
+  resetcraft:
+    description: Reset craft counters for Infuse effects.
+    usage: /resetcraft <effect|all>
+    permission: infuse.admin
+  resetcooldown:
+    description: Reset your primary and secondary Spark cooldowns.
+    usage: /resetcooldown [primary|secondary]
+    aliases: [rsc, rscd, rcd, rscooldown]
+    permission: infuse.admin
+permissions:
+  infuse.admin:
+    description: Manage Infuse settings and items.
+    default: op
+  infuse.use:
+    description: Use Infuse features.
+    default: true

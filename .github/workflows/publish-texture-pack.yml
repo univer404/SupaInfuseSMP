@@ -1,0 +1,68 @@
+name: Publish Infuse Texture Pack
+on:
+  push:
+    paths:
+      - ".github/workflows/publish-texture-pack.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare Minecraft 1.21.11 texture pack
+        run: |
+          python - <<'PY'
+          import hashlib, io, json, os, urllib.request, zipfile
+          source_url = "https://raw.githubusercontent.com/o-hex/InfuseS3/main/_texturepack.zip"
+          request = urllib.request.Request(source_url, headers={"User-Agent": "SupaInfuseSMP-pack-builder"})
+          with urllib.request.urlopen(request, timeout=30) as response:
+              original = response.read()
+          expected = "2a4079e2f08424192e4ee8b8d3df26d1f386cd15"
+          actual = hashlib.sha1(original).hexdigest()
+          if actual != expected:
+              raise SystemExit(f"Unexpected upstream pack SHA-1: {actual}")
+          source = zipfile.ZipFile(io.BytesIO(original))
+          if "pack.mcmeta" not in source.namelist():
+              raise SystemExit("Original pack is missing pack.mcmeta.")
+          metadata = json.loads(source.read("pack.mcmeta"))
+          pack = metadata.setdefault("pack", {})
+          old_format = pack.get("pack_format", "modern metadata")
+          pack["pack_format"] = 75
+          pack["description"] = "InfuseSMP resource pack - updated metadata for Minecraft 1.21.11"
+          output = io.BytesIO()
+          with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
+              for info in source.infolist():
+                  data = source.read(info.filename)
+                  if info.filename == "pack.mcmeta":
+                      data = json.dumps(metadata, ensure_ascii=False, indent=2).encode("utf-8")
+                  target.writestr(info, data)
+          result = output.getvalue()
+          with zipfile.ZipFile(io.BytesIO(result)) as check:
+              if check.testzip():
+                  raise SystemExit("Generated pack ZIP failed integrity check.")
+              checked = json.loads(check.read("pack.mcmeta"))
+              if checked.get("pack", {}).get("pack_format") != 75:
+                  raise SystemExit("Generated pack does not declare pack_format 75.")
+          os.makedirs("dist", exist_ok=True)
+          path = "dist/Infuse-Texture-Pack-1.21.11.zip"
+          with open(path, "wb") as f:
+              f.write(result)
+          print(f"Updated pack metadata: {old_format} -> 75")
+          print(f"SHA1={hashlib.sha1(result).hexdigest()}")
+          PY
+      - name: Publish stable download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="tpack-1.21.11"
+          asset="dist/Infuse-Texture-Pack-1.21.11.zip"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$asset" --clobber
+          else
+            gh release create "$tag" "$asset" \
+              --target "$GITHUB_SHA" \
+              --title "Infuse Texture Pack for Minecraft 1.21.11" \
+              --notes "Updated pack metadata for Minecraft 1.21.11. Original Infuse assets are preserved; in-game texture, font, model, and sound compatibility still needs client testing."
+          fi
