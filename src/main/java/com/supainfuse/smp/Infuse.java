@@ -274,7 +274,7 @@ public final class Infuse extends JavaPlugin implements Listener {
             Player target = Bukkit.getPlayerExact(args[1]); String effect = clean(args[2]);
             if (target == null) { tell(sender, "not-player"); return true; }
             if (!EFFECTS.contains(effect)) { tell(sender, "unknown-effect"); return true; }
-            boolean augmented = (args.length > 3 && args[3].equalsIgnoreCase("augmented")) || effect.equals("earth") || effect.equals("ender");
+            boolean augmented = args.length > 3 && args[3].equalsIgnoreCase("augmented");
             target.getInventory().addItem(createEffectItem(effect, augmented));
             return true;
         }
@@ -517,7 +517,7 @@ public final class Infuse extends JavaPlugin implements Listener {
         }
         String effect = clean(args[0]);
         if (!EFFECTS.contains(effect)) { tell(sender, "unknown-effect"); return true; }
-        boolean isAugmented = (args.length > 1 && Boolean.parseBoolean(args[1])) || effect.equals("earth") || effect.equals("ender");
+        boolean isAugmented = args.length > 1 && Boolean.parseBoolean(args[1]);
         Map<Integer, ItemStack> leftovers = player.getInventory().addItem(createEffectItem(effect, isAugmented));
         leftovers.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
         return true;
@@ -1977,13 +1977,15 @@ public final class Infuse extends JavaPlugin implements Listener {
                 String[] equippedEffects = slots(player.getUniqueId());
                 boolean[] equippedAugments = augmented.getOrDefault(player.getUniqueId(), new boolean[]{false, false});
                 String primaryHudIcon = equippedEffects[0] == null || equippedEffects[0].isBlank()
-                        ? "\uE088"
+                        ? ""
                         : new String(Character.toChars(effectIconCodePoint(equippedEffects[0], equippedAugments[0])));
                 String secondaryHudIcon = equippedEffects[1] == null || equippedEffects[1].isBlank()
-                        ? "\uE088"
+                        ? ""
                         : new String(Character.toChars(effectIconCodePoint(equippedEffects[1], equippedAugments[1])));
-                player.sendActionBar(mini.deserialize(primaryHudIcon + "   " + secondaryHudIcon)
-                        .decoration(TextDecoration.ITALIC, false));
+                // Do not use the fallback glyph for an empty slot; it maps to the augmented Ender icon.
+                String hud = primaryHudIcon.isEmpty() && secondaryHudIcon.isEmpty() ? ""
+                        : primaryHudIcon + (primaryHudIcon.isEmpty() || secondaryHudIcon.isEmpty() ? "     " : "   ") + secondaryHudIcon;
+                player.sendActionBar(mini.deserialize(hud).decoration(TextDecoration.ITALIC, false));
             }
             if (active.contains("ender")) {
                 for (Player other : player.getWorld().getPlayers()) {
